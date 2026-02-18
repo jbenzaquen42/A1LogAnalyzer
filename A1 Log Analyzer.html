@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A1 Evo Ultimate Analyzer v3.5</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-panel: rgba(30, 41, 59, 0.7);
+            --bg-upload: rgba(15, 23, 42, 0.3);
+            --c-primary: #38bdf8;
+            --c-secondary: #818cf8;
+            --c-success: #4ade80;
+            --c-warning: #fbbf24;
+            --c-danger: #f87171;
+            --text-main: #f1f5f9;
+            --text-sub: #94a3b8;
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(56, 189, 248, 0.3);
+            --shadow-glow: rgba(56, 189, 248, 0.1);
+            --bg-table-head: rgba(56, 189, 248, 0.05);
+            --bg-table-hover: rgba(56, 189, 248, 0.03);
+            --bg-sw-row: rgba(129, 140, 248, 0.1);
+            --bg-avg-row: rgba(56, 189, 248, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-body);
+            background-image: 
+                radial-gradient(circle at 15% 50%, var(--c-secondary) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, var(--c-primary) 0%, transparent 25%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: 'Rajdhani', 'Noto Sans TC', 'Noto Sans JP', 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 20px;
+            transition: all 0.5s ease;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; position: relative; }
+
+        /* Controls Area */
+        .controls-bar {
+            position: absolute; top: 0; right: 0; z-index: 100;
+            display: flex; gap: 10px;
+        }
+        select.ui-select {
+            background: var(--bg-panel); color: var(--text-main);
+            border: 1px solid var(--c-primary);
+            padding: 8px 12px; border-radius: 8px;
+            font-family: 'Rajdhani', sans-serif; font-weight: 600;
+            cursor: pointer; outline: none;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Typography & Bilingual Logic */
+        .lang-primary { font-family: 'Noto Sans TC', 'Noto Sans JP', 'Noto Sans KR', sans-serif; font-weight: 700; display: block; font-size: 1.1em; letter-spacing: 0.5px; }
+        .lang-sub { font-family: 'Rajdhani', sans-serif; font-weight: 500; display: block; font-size: 0.8em; color: var(--text-sub); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        body.lang-en .lang-primary { font-family: 'Rajdhani', sans-serif; font-size: 1em; }
+        body.lang-en .lang-sub { /*display: none;*/ }
+
+        /* Header */
+        header {
+            text-align: center; margin-bottom: 40px; position: relative; padding-bottom: 25px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+        header::after {
+            content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+            width: 300px; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--c-primary), var(--c-secondary), transparent);
+            box-shadow: 0 0 10px var(--c-primary); opacity: 0.7;
+        }
+        .title-main {
+            font-size: 2.8rem; font-weight: 700; color: var(--text-main);
+            text-shadow: 0 0 20px var(--shadow-glow);
+            font-family: 'Rajdhani', sans-serif; letter-spacing: 4px;
+            transition: color 0.5s;
+        }
+        .title-sub { color: var(--c-secondary); letter-spacing: 6px; font-size: 0.9rem; margin-top: 5px; font-weight: 600; opacity: 0.9; }
+
+        /* Panels */
+        .glass-panel {
+            background: var(--bg-panel);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-glass); border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            transition: all 0.5s ease;
+        }
+        .glass-panel:hover { border-color: var(--border-hover); }
+
+        /* Pro Stats Panel */
+        .pro-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(145deg, var(--bg-panel), rgba(255,255,255,0.02));
+            border: 1px solid var(--border-glass);
+            border-top: 2px solid var(--c-primary);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 0%, var(--shadow-glow), transparent 70%);
+            opacity: 0.5; pointer-events: none;
+        }
+        .stat-icon { font-size: 1.5rem; margin-bottom: 5px; opacity: 0.8; }
+        .stat-value { font-family: 'Rajdhani', sans-serif; font-size: 2.2rem; font-weight: 700; color: var(--text-main); text-shadow: 0 0 10px var(--shadow-glow); }
+        .stat-label { font-size: 0.8rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+
+        /* Scoring Breakdown */
+        .criteria-box {
+            margin-top: 20px;
+            border-top: 1px dashed var(--border-glass);
+            padding-top: 15px;
+            font-size: 0.85rem;
+            color: var(--text-sub);
+        }
+        .criteria-title { font-weight: bold; color: var(--c-primary); margin-bottom: 10px; display: block; cursor: pointer; }
+        .criteria-content { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; 
+            background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;
+        }
+        .crit-item { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+        .crit-rank { font-weight: bold; }
+        .crit-s { color: #ffd700; } .crit-a { color: var(--c-primary); } .crit-b { color: var(--c-success); } .crit-c { color: var(--c-warning); }
+        
+        /* Upload */
+        .upload-zone {
+            padding: 40px; text-align: center; cursor: pointer; margin-bottom: 40px;
+            border: 2px dashed var(--text-sub); opacity: 0.8;
+            background: var(--bg-upload);
+        }
+        .upload-zone:hover { 
+            background: var(--bg-table-head); border-color: var(--c-primary); opacity: 1;
+        }
+
+        /* Score & Summary */
+        .eval-grid { display: grid; grid-template-columns: 350px 1fr; gap: 25px; margin-bottom: 35px; }
+        .score-card { display: flex; flex-direction: column; padding: 25px; height: 100%; justify-content: flex-start; }
+        
+        .score-display-row {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            margin-bottom: 15px; flex-grow: 1;
+        }
+
+        .score-circle {
+            width: 140px; height: 140px; border-radius: 50%;
+            border: 4px solid rgba(128,128,128,0.1);
+            border-top: 4px solid var(--c-primary); border-right: 4px solid var(--c-secondary);
+            box-shadow: 0 0 15px var(--shadow-glow);
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            margin-bottom: 15px; animation: spin-glow 8s linear infinite;
+        }
+        @keyframes spin-glow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .score-content { position: absolute; display: flex; flex-direction: column; align-items: center; }
+        .score-val { font-size: 3.5rem; font-weight: 700; color: var(--text-main); text-shadow: 0 0 10px var(--shadow-glow); line-height: 1; font-family: 'Rajdhani', sans-serif; }
+        .score-lbl { font-size: 0.8rem; letter-spacing: 2px; color: var(--c-primary); margin-top: 5px; }
+        
+        .rank-badge {
+            font-size: 1.5rem; font-weight: 800; padding: 5px 30px; color: var(--text-main);
+            border: 1px solid var(--c-primary); border-radius: 4px; background: var(--bg-table-head);
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .summary-card { padding: 30px; display: flex; flex-direction: column; justify-content: center; }
+        .summary-item { margin-bottom: 12px; display: flex; align-items: flex-start; line-height: 1.6; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; }
+        .summary-item:last-child { border-bottom: none; }
+        .summary-icon { margin-right: 12px; font-size: 1.2rem; filter: grayscale(0.2); }
+        
+        .txt-good { color: var(--c-success); } .txt-warn { color: var(--c-warning); } .txt-bad { color: var(--c-danger); } .txt-info { color: var(--c-primary); }
+
+        /* Charts */
+        .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; margin-bottom: 35px; }
+        .full-width { grid-column: span 2; }
+        .chart-box { padding: 20px; height: 380px; position: relative; }
+        .chart-title { 
+            position: absolute; top: 15px; left: 20px; z-index: 10; pointer-events: none;
+            background: var(--bg-panel); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-glass);
+        }
+
+        /* Table */
+        .table-wrapper { overflow-x: auto; margin-top: 25px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; white-space: nowrap; }
+        th { 
+            text-align: left; padding: 18px; color: var(--c-primary); 
+            border-bottom: 1px solid var(--border-glass); background: var(--bg-table-head);
+        }
+        td { padding: 16px 18px; border-bottom: 1px solid var(--border-glass); color: var(--text-main); }
+        tr:hover td { background: var(--bg-table-hover); }
+        
+        /* Summary Rows in Table */
+        tr.row-sw td { background: var(--bg-sw-row); border-top: 2px solid var(--c-secondary); font-weight: bold; }
+        tr.row-avg td { background: var(--bg-avg-row); border-top: 2px solid var(--c-primary); font-weight: bold; color: var(--c-primary); }
+
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: 1px solid transparent; }
+
+        .hidden { display: none; }
+        
+        @media (max-width: 1000px) {
+            .eval-grid, .charts-grid, .pro-stats-grid { grid-template-columns: 1fr; }
+            .controls-bar { position: relative; justify-content: center; margin-bottom: 20px; right: auto; top: auto; flex-wrap: wrap; }
+            .criteria-content { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="lang-zh"> 
+
+<div class="container">
+    <div class="controls-bar">
+        <select class="ui-select" id="langSelect" onchange="setLanguage(this.value)">
+            <option value="zh">繁體中文 (TW)</option>
+            <option value="en" selected>English (US)</option>
+            <option value="jp">日本語 (JP)</option>
+            <option value="de">Deutsch (DE)</option>
+            <option value="fr">Français (FR)</option>
+            <option value="es">Español (ES)</option>
+            <option value="it">Italiano (IT)</option>
+            <option value="pt">Português (PT)</option>
+            <option value="kr">한국어 (KR)</option>
+            <option value="ru">Русский (RU)</option>
+        </select>
+        <select class="ui-select" id="themeSelect" onchange="applyTheme(this.value)">
+            <optgroup label="Dark Themes">
+                <option value="dark_default" selected>🌌 Deep Space</option>
+                <option value="dark_onyx">🌑 Cyber Onyx</option>
+                <option value="dark_forest">🌲 Midnight Forest</option>
+                <option value="dark_amethyst">🔮 Amethyst Void</option>
+                <option value="dark_carbon">🏎️ Carbon Red</option>
+            </optgroup>
+            <optgroup label="Light Themes">
+                <option value="light_polar">❄️ Polar White</option>
+                <option value="light_ceramic">🏺 Ceramic Gray</option>
+                <option value="light_mint">🌿 Mint Lab</option>
+                <option value="light_lavender">🌸 Lavender Mist</option>
+                <option value="light_steel">🏙️ Steel Blue</option>
+            </optgroup>
+        </select>
+    </div>
+
+    <header>
+        <div class="title-main">A1 EVO ACOUSTIX LOG ANALYZER</div>
+        <div class="title-sub">OCA's ACOUSTIC CALIBRATION SYSTEM v20260125</div>
+    </header>
+
+    <div class="glass-panel upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <h3 class="txt-render" data-key="drop_title" style="color: var(--c-primary); margin-bottom: 5px; font-size: 1.5rem; letter-spacing: 1px;">INITIALIZE DATA STREAM</h3>
+        <p class="txt-render" data-key="drop_sub" style="color: var(--text-sub); text-transform: uppercase; letter-spacing: 2px; font-size: 0.85rem;">Drag & Drop Log File</p>
+        <p class="mono" style="font-size: 0.8rem; color: var(--text-sub); margin-top: 10px; opacity: 0.7;">SUPPORTED FORMAT: session_log_xxxx.txt</p>
+        <input type="file" id="fileInput" accept=".txt" style="display: none">
+    </div>
+
+    <div id="dashboard" class="hidden">
+        
+        <div class="pro-stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📶</div>
+                <div class="stat-value" id="val_avg_snr">-</div>
+                <div class="stat-label txt-render" data-key="stat_snr">SYSTEM AVG SNR</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-value" id="val_sys_jitter">-</div>
+                <div class="stat-label txt-render" data-key="stat_jitter">SYSTEM CLOCK JITTER</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-value" id="val_tot_impulse">-</div>
+                <div class="stat-label txt-render" data-key="stat_impulse">TOTAL DELAY (ms)</div>
+            </div>
+             <div class="stat-card">
+                <div class="stat-icon">🔊</div>
+                <div class="stat-value" id="val_sw_count">-</div>
+                <div class="stat-label txt-render" data-key="stat_sub">SUBWOOFERS ACTIVE</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🛡️</div>
+                <div class="stat-value" id="val_tot_rej">-</div>
+                <div class="stat-label txt-render" data-key="stat_rej">TOTAL REJECTIONS</div>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 25px;">
+            <div style="margin-bottom: 20px;">
+                <span class="txt-render" data-key="table_title" style="color: var(--c-primary); font-size: 1.2rem; font-weight: bold;">詳細量測數據表</span>
+            </div>
+            <div class="table-wrapper">
+                <table id="dataTable" class="mono">
+                    <thead>
+                        <tr>
+                            <th><span class="txt-render" data-key="col_ch">聲道</span></th>
+                            <th><span class="txt-render" data-key="col_status">狀態</span></th>
+                            <th><span class="txt-render" data-key="col_acc">接受</span></th>
+                            <th><span class="txt-render" data-key="col_rej">排斥</span></th>
+                            <th><span class="txt-render" data-key="col_base_snr">初始 SNR</span></th>
+                            <th><span class="txt-render" data-key="col_final_snr">最終 SNR</span></th>
+                            <th><span class="txt-render" data-key="col_gain">增益</span></th>
+                            <th><span class="txt-render" data-key="col_peak_jit">峰值抖動</span></th>
+                            <th><span class="txt-render" data-key="col_peak_freq">峰值頻率</span></th>
+                            <th><span class="txt-render" data-key="col_avg_jit">平均抖動</span></th>
+                            <th><span class="txt-render" data-key="col_polarity">極性</span></th>
+                            <th><span class="txt-render" data-key="col_impulse">脈衝時間</span></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="eval-grid">
+            <div class="glass-panel score-card">
+                <div class="score-display-row">
+                    <div style="position: relative; display: flex; justify-content: center; align-items: center;">
+                        <div class="score-circle"></div>
+                        <div class="score-content">
+                            <span class="score-val" id="scoreValue">0</span>
+                            <span class="score-lbl">SCORE</span>
+                        </div>
+                    </div>
+                    <div class="rank-badge" id="rankBadge">-</div>
+                </div>
+
+                <div class="criteria-box">
+                    <div class="criteria-title txt-render" data-key="crit_title" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        ▼ 查看評分標準 (SCORING LOGIC)
+                    </div>
+                    <div class="criteria-content hidden">
+                        <div class="mono" style="grid-column: span 2; margin-bottom: 10px; color: var(--c-primary);">BASE SCORE: 100 POINTS</div>
+                        
+                        <div>
+                            <div class="crit-item"><span>SNR &lt; 52dB</span> <span class="txt-bad">-2 / dB</span></div>
+                            <div class="crit-item"><span>Jitter &gt; 30us</span> <span class="txt-bad">-0.5 / us</span></div>
+                            <div class="crit-item"><span>Rejection</span> <span class="txt-bad">-1 / event</span></div>
+                        </div>
+
+                        <div>
+                            <div class="crit-item"><span class="crit-rank crit-s">S CLASS</span> <span>95 - 100</span></div>
+                            <div class="crit-item"><span class="crit-rank crit-a">A CLASS</span> <span>85 - 94</span></div>
+                            <div class="crit-item"><span class="crit-rank crit-b">B CLASS</span> <span>75 - 84</span></div>
+                            <div class="crit-item"><span class="crit-rank crit-c">C CLASS</span> <span>&lt; 75</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-panel summary-card">
+                <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
+                    <span class="txt-render" data-key="summary_title" style="color: var(--c-primary); font-size: 1.1rem; font-weight: bold;">系統診斷摘要</span>
+                </div>
+                <div id="summaryText" style="color: var(--text-main);">Analyzing...</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="glass-panel chart-box">
+                <div class="chart-title txt-render" data-key="chart_accept">測量狀態分佈</div>
+                <canvas id="chartAccept"></canvas>
+            </div>
+            <div class="glass-panel chart-box">
+                <div class="chart-title txt-render" data-key="chart_snr">訊號噪訊比改善</div>
+                <canvas id="chartSNR"></canvas>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="glass-panel chart-box">
+                <div class="chart-title txt-render" data-key="chart_avg_jitter">平均時基誤差</div>
+                <canvas id="chartAvgJitter"></canvas>
+            </div>
+            <div class="glass-panel chart-box">
+                <div class="chart-title txt-render" data-key="chart_peak_jitter">峰值抖動與頻率</div>
+                <canvas id="chartPeakJitter"></canvas>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="glass-panel chart-box full-width">
+                <div class="chart-title txt-render" data-key="chart_impulse">脈衝峰值時間</div>
+                <canvas id="chartImpulse"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Multilingual Channel Dictionary (Expanded v3.4) ---
+    const channelNames = {
+        "FL": { en: "Front Left", zh: "左前置", jp: "フロント左", de: "Vorne Links", fr: "Avant Gauche", es: "Frontal Izq", it: "Anteriore Sx", pt: "Frontal Esq", kr: "전면 좌측", ru: "Фронт. левый" },
+        "FR": { en: "Front Right", zh: "右前置", jp: "フロント右", de: "Vorne Rechts", fr: "Avant Droit", es: "Frontal Der", it: "Anteriore Dx", pt: "Frontal Dir", kr: "전면 우측", ru: "Фронт. правый" },
+        "C": { en: "Center", zh: "中置", jp: "センター", de: "Center", fr: "Centre", es: "Central", it: "Centrale", pt: "Central", kr: "센터", ru: "Центр" },
+        "SW": { en: "Subwoofer", zh: "超低音", jp: "サブウーファー", de: "Subwoofer", fr: "Caisson", es: "Subwoofer", it: "Subwoofer", pt: "Subwoofer", kr: "서브우퍼", ru: "Сабвуфер" },
+        "SLA": { en: "Surround Left", zh: "左側環繞", jp: "サラウンド左", de: "Surround Links", fr: "Surround Gauche", es: "Surround Izq", it: "Surround Sx", pt: "Surround Esq", kr: "서라운드 좌측", ru: "Сурраунд левый" },
+        "SRA": { en: "Surround Right", zh: "右側環繞", jp: "サラウンド右", de: "Surround Rechts", fr: "Surround Droit", es: "Surround Der", it: "Surround Dx", pt: "Surround Dir", kr: "서라운드 우측", ru: "Сурраунд правый" },
+        "SBL": { en: "Surr. Back Left", zh: "左後環繞", jp: "サラウンドバック左", de: "Surr. Back Links", fr: "Arr. Surround G", es: "Surr. Trasero Izq", it: "Surr. Post. Sx", pt: "Surr. Tras. Esq", kr: "후면 서라운드 좌", ru: "Тыловой левый" },
+        "SBR": { en: "Surr. Back Right", zh: "右後環繞", jp: "サラウンドバック右", de: "Surr. Back Rechts", fr: "Arr. Surround D", es: "Surr. Trasero Der", it: "Surr. Post. Dx", pt: "Surr. Tras. Dir", kr: "후면 서라운드 우", ru: "Тыловой правый" },
+        
+        // Expanded Channels
+        "FWL": { en: "Front Wide Left", zh: "左前寬", jp: "フロントワイド左", de: "Front Wide Links", fr: "Avant Large G", es: "Ancho Frontal Izq", it: "Wide Ant. Sx", pt: "Frontal Amplo Esq", kr: "전면 와이드 좌", ru: "Широкий фронт. Л" },
+        "FWR": { en: "Front Wide Right", zh: "右前寬", jp: "フロントワイド右", de: "Front Wide Rechts", fr: "Avant Large D", es: "Ancho Frontal Der", it: "Wide Ant. Dx", pt: "Frontal Amplo Dir", kr: "전면 와이드 우", ru: "Широкий фронт. П" },
+        "FHL": { en: "Front Height L", zh: "左前天空", jp: "フロントハイト左", de: "Front Height L", fr: "Hauteur Avant G", es: "Altura Frontal Izq", it: "Altezza Ant. Sx", pt: "Altura Front. Esq", kr: "전면 높이 좌", ru: "Верхний перед. Л" },
+        "FHR": { en: "Front Height R", zh: "右前天空", jp: "フロントハイト右", de: "Front Height R", fr: "Hauteur Avant D", es: "Altura Frontal Der", it: "Altezza Ant. Dx", pt: "Altura Front. Dir", kr: "전면 높이 우", ru: "Верхний перед. П" },
+        "TML": { en: "Top Middle Left", zh: "左中天空", jp: "トップミドル左", de: "Top Middle Links", fr: "Top Milieu G", es: "Techo Medio Izq", it: "Top Medio Sx", pt: "Teto Médio Esq", kr: "상단 중간 좌", ru: "Верхний средний Л" },
+        "TMR": { en: "Top Middle Right", zh: "右中天空", jp: "トップミドル右", de: "Top Middle Rechts", fr: "Top Milieu D", es: "Techo Medio Der", it: "Top Medio Dx", pt: "Teto Médio Dir", kr: "상단 중간 우", ru: "Верхний средний П" },
+        "TRL": { en: "Top Rear Left", zh: "左後天空", jp: "トップリア左", de: "Top Rear Links", fr: "Top Arrière G", es: "Techo Trasero Izq", it: "Top Post. Sx", pt: "Teto Tras. Esq", kr: "상단 후면 좌", ru: "Верхний задний Л" },
+        "TRR": { en: "Top Rear Right", zh: "右後天空", jp: "トップリア右", de: "Top Rear Rechts", fr: "Top Arrière D", es: "Techo Trasero Der", it: "Top Post. Dx", pt: "Teto Tras. Dir", kr: "상단 후면 우", ru: "Верхний задний П" },
+        "RHL": { en: "Rear Height Left", zh: "左後增高", jp: "リアハイト左", de: "Rear Height Links", fr: "Hauteur Arrière G", es: "Altura Trasera Izq", it: "Altezza Post. Sx", pt: "Altura Tras. Esq", kr: "후면 높이 좌", ru: "Задний верхний Л" },
+        "RHR": { en: "Rear Height Right", zh: "右後增高", jp: "リアハイト右", de: "Rear Height Rechts", fr: "Hauteur Arrière D", es: "Altura Trasera Der", it: "Altezza Post. Dx", pt: "Altura Tras. Dir", kr: "후면 높이 우", ru: "Задний верхний П" },
+        "TFL": { en: "Top Front Left", zh: "左上天空", jp: "トップフロント左", de: "Top Front Links", fr: "Top Avant G", es: "Techo Frontal Izq", it: "Top Ant. Sx", pt: "Teto Front. Esq", kr: "상단 전면 좌", ru: "Верхний перед. Л" },
+        "TFR": { en: "Top Front Right", zh: "右上天空", jp: "トップフロント右", de: "Top Front Rechts", fr: "Top Avant D", es: "Techo Frontal Der", it: "Top Ant. Dx", pt: "Teto Front. Dir", kr: "상단 전면 우", ru: "Верхний перед. П" },
+        "TS": { en: "Top Surround", zh: "頂層環繞", jp: "トップサラウンド", de: "Top Surround", fr: "Top Surround", es: "Surround Techo", it: "Top Surround", pt: "Surround Teto", kr: "탑 서라운드", ru: "Потолочный сурраунд" },
+        "CH": { en: "Center Height", zh: "中置增高", jp: "センターハイト", de: "Center Height", fr: "Hauteur Centre", es: "Altura Central", it: "Altezza Centrale", pt: "Altura Central", kr: "센터 높이", ru: "Центральный верхний" }
+    };
+
+    const dict = {
+        en: {
+            drop_title: "INITIALIZE DATA STREAM", drop_sub: "Drag & Drop Log File",
+            stat_snr: "SYSTEM AVG SNR", stat_jitter: "SYS CLOCK JITTER", stat_impulse: "TOTAL DELAY (ms)", stat_sub: "ACTIVE SUBWOOFERS", stat_rej: "TOTAL REJECTIONS",
+            crit_title: "▼ VIEW SCORING LOGIC",
+            summary_title: "System Diagnostic Summary",
+            chart_accept: "Measurement Acceptance", chart_snr: "SNR Improvement (Base vs Final)",
+            chart_avg_jitter: "Average Jitter (System Stability)", chart_peak_jitter: "Peak Jitter & Frequency Analysis",
+            chart_impulse: "Impulse Peak Time (Time Alignment)",
+            table_title: "Detailed Telemetry Data Table",
+            col_ch: "CH", col_status: "Status", col_acc: "Acc.", col_rej: "Rej.",
+            col_base_snr: "Base SNR", col_final_snr: "Final SNR", col_gain: "Gain",
+            col_peak_jit: "Pk Jitter", col_peak_freq: "Pk Freq", col_avg_jit: "Avg Jitter",
+            col_polarity: "Polarity", col_impulse: "Impulse",
+            row_sw: "SW (SUB) SUMMARY", row_avg: "SYSTEM AVERAGE",
+            sum_good_snr: "Excellent Signal Quality", sum_ok_snr: "Good Signal Quality", sum_bad_snr: "High Noise Floor Detected",
+            sum_good_jit: "Rock Solid Clocking", sum_warn_jit: "Jitter slightly elevated",
+            sum_good_rej: "Perfect Data Integrity", sum_bad_rej: "measurements rejected",
+            perfect: "PERFECT", warn: "WARN", normal: "Normal", inverted: "Inverted"
+        },
+        zh: {
+            drop_title: "啟動數據串流分析", drop_sub: "拖放 Log 檔案至此",
+            stat_snr: "系統平均噪訊比", stat_jitter: "系統平均時基誤差", stat_impulse: "脈衝延遲總和", stat_sub: "超低音數量", stat_rej: "總排斥次數",
+            crit_title: "▼ 查看評分標準邏輯",
+            summary_title: "系統診斷摘要",
+            chart_accept: "測量狀態分佈", chart_snr: "訊號噪訊比改善",
+            chart_avg_jitter: "平均時基誤差", chart_peak_jitter: "峰值抖動與頻率",
+            chart_impulse: "脈衝峰值時間",
+            table_title: "詳細遙測數據表",
+            col_ch: "聲道", col_status: "狀態", col_acc: "接受", col_rej: "排斥",
+            col_base_snr: "初始 SNR", col_final_snr: "最終 SNR", col_gain: "增益",
+            col_peak_jit: "峰值抖動", col_peak_freq: "峰值頻率", col_avg_jit: "平均抖動",
+            col_polarity: "極性推估", col_impulse: "脈衝時間",
+            row_sw: "重低音(SW) 彙整", row_avg: "全系統平均",
+            sum_good_snr: "訊號品質優異", sum_ok_snr: "訊號品質良好", sum_bad_snr: "底噪偏高",
+            sum_good_jit: "時鐘極度穩定", sum_warn_jit: "時基誤差注意",
+            sum_good_rej: "完美測量", sum_bad_rej: "次測量因干擾被拒",
+            perfect: "完美", warn: "警告", normal: "正相", inverted: "反相"
+        },
+        jp: {
+            drop_title: "データストリーム初期化", drop_sub: "ログファイルをドロップ",
+            stat_snr: "システム平均 SNR", stat_jitter: "システムクロックジッター", stat_impulse: "合計遅延時間 (ms)", stat_sub: "サブウーファー数", stat_rej: "総拒否回数",
+            crit_title: "▼ スコアリング基準を表示",
+            summary_title: "システム診断サマリー",
+            chart_accept: "測定ステータス分布", chart_snr: "SNR改善率",
+            chart_avg_jitter: "平均ジッター (安定性)", chart_peak_jitter: "ピークジッターと周波数",
+            chart_impulse: "インパルスピーク時間",
+            table_title: "詳細テレメトリデータ",
+            col_ch: "Ch", col_status: "状態", col_acc: "受理", col_rej: "拒否",
+            col_base_snr: "初期 SNR", col_final_snr: "最終 SNR", col_gain: "ゲイン",
+            col_peak_jit: "Pk Jitter", col_peak_freq: "Pk Freq", col_avg_jit: "Avg Jitter",
+            col_polarity: "極性", col_impulse: "インパルス",
+            row_sw: "サブウーファー集計", row_avg: "システム平均",
+            sum_good_snr: "信号品質は優れています", sum_ok_snr: "信号品質は良好です", sum_bad_snr: "ノイズフロアが高い",
+            sum_good_jit: "クロックは非常に安定", sum_warn_jit: "ジッターに注意",
+            sum_good_rej: "完璧な測定", sum_bad_rej: "回の測定が拒否されました",
+            perfect: "完璧", warn: "警告", normal: "正相", inverted: "逆相"
+        },
+        de: {
+            drop_title: "DATENSTROM INITIALISIEREN", drop_sub: "Log-Datei hier ablegen",
+            stat_snr: "SYSTEM-Ø SNR", stat_jitter: "SYSTEM-CLOCK-JITTER", stat_impulse: "GESAMTVERZÖGERUNG", stat_sub: "AKTIVE SUBWOOFER", stat_rej: "GESAMTABLEHNUNGEN",
+            crit_title: "▼ BEWERTUNGSLOGIK ANZEIGEN",
+            summary_title: "Diagnose-Zusammenfassung",
+            chart_accept: "Messakzeptanz", chart_snr: "SNR-Verbesserung",
+            chart_avg_jitter: "Durchschnittlicher Jitter", chart_peak_jitter: "Peak-Jitter & Frequenz",
+            chart_impulse: "Impuls-Spitzenzeit",
+            table_title: "Detaillierte Telemetriedaten",
+            col_ch: "Kanal", col_status: "Status", col_acc: "Akz.", col_rej: "Abg.",
+            col_base_snr: "Basis-SNR", col_final_snr: "Final-SNR", col_gain: "Verst.",
+            col_peak_jit: "Peak-Jitter", col_peak_freq: "Peak-Freq", col_avg_jit: "Ø Jitter",
+            col_polarity: "Polarität", col_impulse: "Impuls",
+            row_sw: "SUBWOOFER-ZUSAMMENFASSUNG", row_avg: "SYSTEMDURCHSCHNITT",
+            sum_good_snr: "Exzellente Signalqualität", sum_ok_snr: "Gute Signalqualität", sum_bad_snr: "Hohes Grundrauschen",
+            sum_good_jit: "Sehr stabiler Takt", sum_warn_jit: "Jitter leicht erhöht",
+            sum_good_rej: "Perfekte Datenintegrität", sum_bad_rej: "Messungen abgelehnt",
+            perfect: "PERFEKT", warn: "WARNUNG", normal: "Normal", inverted: "Invertiert"
+        },
+        fr: {
+            drop_title: "INITIALISER LE FLUX", drop_sub: "Déposez le fichier Log",
+            stat_snr: "SNR MOYEN SYSTÈME", stat_jitter: "JITTER SYSTÈME", stat_impulse: "RETARD TOTAL (ms)", stat_sub: "SUBWOOFERS ACTIFS", stat_rej: "REJETS TOTAUX",
+            crit_title: "▼ VOIR LA LOGIQUE DE NOTATION",
+            summary_title: "Résumé du diagnostic",
+            chart_accept: "Acceptation des mesures", chart_snr: "Amélioration SNR",
+            chart_avg_jitter: "Jitter moyen", chart_peak_jitter: "Pic de Jitter & Fréquence",
+            chart_impulse: "Temps d'impulsion",
+            table_title: "Données télémétriques détaillées",
+            col_ch: "Canal", col_status: "État", col_acc: "Acc.", col_rej: "Rej.",
+            col_base_snr: "SNR Base", col_final_snr: "SNR Final", col_gain: "Gain",
+            col_peak_jit: "Pic Jitter", col_peak_freq: "Pic Fréq", col_avg_jit: "Moy Jitter",
+            col_polarity: "Polarité", col_impulse: "Impulsion",
+            row_sw: "RÉSUMÉ SUBWOOFER", row_avg: "MOYENNE SYSTÈME",
+            sum_good_snr: "Excellente qualité de signal", sum_ok_snr: "Bonne qualité de signal", sum_bad_snr: "Bruit de fond élevé",
+            sum_good_jit: "Horloge très stable", sum_warn_jit: "Jitter légèrement élevé",
+            sum_good_rej: "Intégrité parfaite", sum_bad_rej: "mesures rejetées",
+            perfect: "PARFAIT", warn: "ATTENTION", normal: "Normal", inverted: "Inversé"
+        },
+        es: {
+            drop_title: "INICIALIZAR DATOS", drop_sub: "Arrastre el archivo de registro",
+            stat_snr: "SNR PROMEDIO", stat_jitter: "JITTER DE RELOJ", stat_impulse: "RETARDO TOTAL", stat_sub: "SUBWOOFERS ACTIVOS", stat_rej: "RECHAZOS TOTALES",
+            crit_title: "▼ VER LÓGICA DE PUNTUACIÓN",
+            summary_title: "Resumen de diagnóstico",
+            chart_accept: "Aceptación de medidas", chart_snr: "Mejora de SNR",
+            chart_avg_jitter: "Jitter medio", chart_peak_jitter: "Pico de Jitter y Frecuencia",
+            chart_impulse: "Tiempo de impulso",
+            table_title: "Datos de telemetría detallados",
+            col_ch: "Canal", col_status: "Estado", col_acc: "Acep.", col_rej: "Rech.",
+            col_base_snr: "SNR Base", col_final_snr: "SNR Final", col_gain: "Ganancia",
+            col_peak_jit: "Pico Jitter", col_peak_freq: "Pico Frec", col_avg_jit: "Jitter Med",
+            col_polarity: "Polaridad", col_impulse: "Impulso",
+            row_sw: "RESUMEN SUBWOOFER", row_avg: "PROMEDIO SISTEMA",
+            sum_good_snr: "Excelente calidad de señal", sum_ok_snr: "Buena calidad de señal", sum_bad_snr: "Ruido de fondo alto",
+            sum_good_jit: "Reloj muy estable", sum_warn_jit: "Jitter ligeramente elevado",
+            sum_good_rej: "Integridad perfecta", sum_bad_rej: "medidas rechazadas",
+            perfect: "PERFECTO", warn: "AVISO", normal: "Normal", inverted: "Invertido"
+        },
+        it: {
+            drop_title: "INIZIALIZZA DATI", drop_sub: "Trascina il file di registro",
+            stat_snr: "SNR MEDIA SISTEMA", stat_jitter: "JITTER SISTEMA", stat_impulse: "RITARDO TOTALE", stat_sub: "SUBWOOFER ATTIVI", stat_rej: "RIFIUTI TOTALI",
+            crit_title: "▼ VEDI LOGICA PUNTEGGIO",
+            summary_title: "Riepilogo diagnostico",
+            chart_accept: "Accettazione misurazioni", chart_snr: "Miglioramento SNR",
+            chart_avg_jitter: "Jitter medio", chart_peak_jitter: "Picco Jitter & Frequenza",
+            chart_impulse: "Tempo di impulso",
+            table_title: "Dati telemetrici dettagliati",
+            col_ch: "Canale", col_status: "Stato", col_acc: "Acc.", col_rej: "Rif.",
+            col_base_snr: "SNR Base", col_final_snr: "SNR Finale", col_gain: "Guadagno",
+            col_peak_jit: "Picco Jitter", col_peak_freq: "Picco Freq", col_avg_jit: "Jitter Med",
+            col_polarity: "Polarità", col_impulse: "Impulso",
+            row_sw: "RIEPILOGO SUBWOOFER", row_avg: "MEDIA SISTEMA",
+            sum_good_snr: "Eccellente qualità segnale", sum_ok_snr: "Buona qualità segnale", sum_bad_snr: "Rumore di fondo alto",
+            sum_good_jit: "Clock molto stabile", sum_warn_jit: "Jitter leggermente alto",
+            sum_good_rej: "Integrità perfetta", sum_bad_rej: "misurazioni rifiutate",
+            perfect: "PERFETTO", warn: "ATTENZIONE", normal: "Normale", inverted: "Invertita"
+        },
+        pt: {
+            drop_title: "INICIALIZAR DADOS", drop_sub: "Arraste o arquivo de log",
+            stat_snr: "SNR MÉDIO DO SISTEMA", stat_jitter: "JITTER DO SISTEMA", stat_impulse: "ATRASO TOTAL", stat_sub: "SUBWOOFERS ATIVOS", stat_rej: "REJEIÇÕES TOTAIS",
+            crit_title: "▼ VER LÓGICA DE PONTUAÇÃO",
+            summary_title: "Resumo do Diagnóstico",
+            chart_accept: "Aceitação de Medição", chart_snr: "Melhoria SNR",
+            chart_avg_jitter: "Jitter Médio", chart_peak_jitter: "Pico de Jitter & Freq.",
+            chart_impulse: "Tempo de Impulso",
+            table_title: "Dados de Telemetria Detalhados",
+            col_ch: "Canal", col_status: "Estado", col_acc: "Ace.", col_rej: "Rej.",
+            col_base_snr: "SNR Base", col_final_snr: "SNR Final", col_gain: "Ganho",
+            col_peak_jit: "Pico Jitter", col_peak_freq: "Pico Freq", col_avg_jit: "Jitter Méd",
+            col_polarity: "Polaridade", col_impulse: "Impulso",
+            row_sw: "RESUMO SUBWOOFER", row_avg: "MÉDIA DO SISTEMA",
+            sum_good_snr: "Excelente qualidade de sinal", sum_ok_snr: "Boa qualidade de sinal", sum_bad_snr: "Ruído de fundo alto",
+            sum_good_jit: "Clock muito estável", sum_warn_jit: "Jitter levemente alto",
+            sum_good_rej: "Integridade perfeita", sum_bad_rej: "medições rejeitadas",
+            perfect: "PERFEITO", warn: "AVISO", normal: "Normal", inverted: "Invertida"
+        },
+        kr: {
+            drop_title: "데이터 스트림 초기화", drop_sub: "로그 파일을 드래그하세요",
+            stat_snr: "시스템 평균 SNR", stat_jitter: "시스템 클럭 지터", stat_impulse: "총 지연 시간", stat_sub: "활성 서브우퍼", stat_rej: "총 거부 횟수",
+            crit_title: "▼ 채점 기준 보기",
+            summary_title: "시스템 진단 요약",
+            chart_accept: "측정 수락 상태", chart_snr: "SNR 개선 (기본 vs 최종)",
+            chart_avg_jitter: "평균 지터 (시스템 안정성)", chart_peak_jitter: "피크 지터 및 주파수",
+            chart_impulse: "임펄스 피크 시간",
+            table_title: "상세 원격 측정 데이터",
+            col_ch: "채널", col_status: "상태", col_acc: "수락", col_rej: "거부",
+            col_base_snr: "기본 SNR", col_final_snr: "최종 SNR", col_gain: "이득",
+            col_peak_jit: "피크 지터", col_peak_freq: "피크 주파수", col_avg_jit: "평균 지터",
+            col_polarity: "극성", col_impulse: "임펄스",
+            row_sw: "서브우퍼 요약", row_avg: "시스템 평균",
+            sum_good_snr: "신호 품질 우수", sum_ok_snr: "신호 품질 양호", sum_bad_snr: "높은 노이즈 감지됨",
+            sum_good_jit: "매우 안정적인 클럭", sum_warn_jit: "지터 다소 높음",
+            sum_good_rej: "데이터 무결성 완벽", sum_bad_rej: "회 측정 거부됨",
+            perfect: "완벽", warn: "경고", normal: "정상", inverted: "반전됨"
+        },
+        ru: {
+            drop_title: "ИНИЦИАЛИЗАЦИЯ ДАННЫХ", drop_sub: "Перетащите файл лога",
+            stat_snr: "СРЕДНИЙ SNR", stat_jitter: "ДЖИТТЕР СИСТЕМЫ", stat_impulse: "ОБЩАЯ ЗАДЕРЖКА", stat_sub: "АКТИВНЫЕ САБВУФЕРЫ", stat_rej: "ВСЕГО ОТКЛОНЕНО",
+            crit_title: "▼ ПОКАЗАТЬ ЛОГИКУ ОЦЕНКИ",
+            summary_title: "Сводка диагностики",
+            chart_accept: "Статус измерений", chart_snr: "Улучшение SNR",
+            chart_avg_jitter: "Средний джиттер", chart_peak_jitter: "Пиковый джиттер и частота",
+            chart_impulse: "Время импульса",
+            table_title: "Подробные данные телеметрии",
+            col_ch: "Канал", col_status: "Статус", col_acc: "Прин.", col_rej: "Откл.",
+            col_base_snr: "Баз. SNR", col_final_snr: "Фин. SNR", col_gain: "Усил.",
+            col_peak_jit: "Пик джиттер", col_peak_freq: "Пик част.", col_avg_jit: "Ср. джиттер",
+            col_polarity: "Полярность", col_impulse: "Импульс",
+            row_sw: "СВОДКА САБВУФЕРА", row_avg: "СРЕДНЕЕ ПО СИСТЕМЕ",
+            sum_good_snr: "Отличное качество сигнала", sum_ok_snr: "Хорошее качество сигнала", sum_bad_snr: "Высокий уровень шума",
+            sum_good_jit: "Очень стабильный клок", sum_warn_jit: "Джиттер немного повышен",
+            sum_good_rej: "Идеальная целостность", sum_bad_rej: "измерений отклонено",
+            perfect: "ОТЛИЧНО", warn: "ВНИМАНИЕ", normal: "Норма", inverted: "Инверсия"
+        }
+    };
+
+    let currentLang = 'en';
+    
+    function setLanguage(lang) {
+        currentLang = lang;
+        document.body.className = `lang-${lang}`;
+        document.querySelectorAll('.txt-render').forEach(el => {
+            const key = el.getAttribute('data-key');
+            el.innerHTML = renderText(key);
+        });
+        if(storedData) renderDashboard(storedData);
+    }
+
+    function renderText(key, suffix = "") {
+        const primary = dict[currentLang][key] || key;
+        const sub = dict['en'][key] || key;
+        if (currentLang === 'en') return primary + suffix;
+        return `<span class="lang-primary">${primary}${suffix}</span><span class="lang-sub">${sub}${suffix}</span>`;
+    }
+
+    function getTextRaw(key) {
+        return dict[currentLang][key] || dict['en'][key];
+    }
+
+    // --- Theme Engine ---
+    const themes = {
+        dark_default: { bg: '#0f172a', panel: 'rgba(30, 41, 59, 0.7)', primary: '#38bdf8', secondary: '#818cf8', text: '#f1f5f9', sub: '#94a3b8', grid: 'rgba(255,255,255,0.05)', type: 'dark', row_sw: 'rgba(129, 140, 248, 0.1)', row_avg: 'rgba(56, 189, 248, 0.1)' },
+        dark_onyx: { bg: '#000000', panel: 'rgba(20, 20, 20, 0.8)', primary: '#fbbf24', secondary: '#a855f7', text: '#e5e5e5', sub: '#737373', grid: 'rgba(255,255,255,0.08)', type: 'dark', row_sw: 'rgba(168, 85, 247, 0.1)', row_avg: 'rgba(251, 191, 36, 0.1)' },
+        dark_forest: { bg: '#022c22', panel: 'rgba(6, 78, 59, 0.6)', primary: '#34d399', secondary: '#2dd4bf', text: '#ecfdf5', sub: '#6ee7b7', grid: 'rgba(255,255,255,0.05)', type: 'dark', row_sw: 'rgba(45, 212, 191, 0.1)', row_avg: 'rgba(52, 211, 153, 0.1)' },
+        dark_amethyst: { bg: '#2e1065', panel: 'rgba(76, 29, 149, 0.5)', primary: '#d8b4fe', secondary: '#f472b6', text: '#faf5ff', sub: '#c084fc', grid: 'rgba(255,255,255,0.05)', type: 'dark', row_sw: 'rgba(244, 114, 182, 0.1)', row_avg: 'rgba(216, 180, 254, 0.1)' },
+        dark_carbon: { bg: '#18181b', panel: 'rgba(39, 39, 42, 0.7)', primary: '#f87171', secondary: '#fb923c', text: '#f4f4f5', sub: '#a1a1aa', grid: 'rgba(255,255,255,0.05)', type: 'dark', row_sw: 'rgba(251, 146, 60, 0.1)', row_avg: 'rgba(248, 113, 113, 0.1)' },
+        light_polar: { bg: '#f8fafc', panel: 'rgba(255, 255, 255, 0.8)', primary: '#0ea5e9', secondary: '#6366f1', text: '#0f172a', sub: '#64748b', grid: 'rgba(0,0,0,0.05)', type: 'light', row_sw: 'rgba(99, 102, 241, 0.1)', row_avg: 'rgba(14, 165, 233, 0.1)' },
+        light_ceramic: { bg: '#f5f5f4', panel: 'rgba(255, 255, 255, 0.7)', primary: '#d97706', secondary: '#57534e', text: '#292524', sub: '#78716c', grid: 'rgba(0,0,0,0.05)', type: 'light', row_sw: 'rgba(87, 83, 78, 0.1)', row_avg: 'rgba(217, 119, 6, 0.1)' },
+        light_mint: { bg: '#f0fdf4', panel: 'rgba(255, 255, 255, 0.8)', primary: '#10b981', secondary: '#14b8a6', text: '#064e3b', sub: '#059669', grid: 'rgba(0,0,0,0.05)', type: 'light', row_sw: 'rgba(20, 184, 166, 0.1)', row_avg: 'rgba(16, 185, 129, 0.1)' },
+        light_lavender: { bg: '#faf5ff', panel: 'rgba(255, 255, 255, 0.8)', primary: '#9333ea', secondary: '#c026d3', text: '#4c1d95', sub: '#7c3aed', grid: 'rgba(0,0,0,0.05)', type: 'light', row_sw: 'rgba(192, 38, 211, 0.1)', row_avg: 'rgba(147, 51, 234, 0.1)' },
+        light_steel: { bg: '#f1f5f9', panel: 'rgba(255, 255, 255, 0.9)', primary: '#334155', secondary: '#475569', text: '#0f172a', sub: '#475569', grid: 'rgba(0,0,0,0.08)', type: 'light', row_sw: 'rgba(71, 85, 105, 0.1)', row_avg: 'rgba(51, 65, 85, 0.1)' }
+    };
+
+    let currentTheme = themes.dark_default;
+    let storedData = null;
+
+    function applyTheme(themeKey) {
+        currentTheme = themes[themeKey];
+        const r = document.documentElement;
+        r.style.setProperty('--bg-body', currentTheme.bg);
+        r.style.setProperty('--bg-panel', currentTheme.panel);
+        r.style.setProperty('--c-primary', currentTheme.primary);
+        r.style.setProperty('--c-secondary', currentTheme.secondary);
+        r.style.setProperty('--text-main', currentTheme.text);
+        r.style.setProperty('--text-sub', currentTheme.sub);
+        r.style.setProperty('--bg-sw-row', currentTheme.row_sw);
+        r.style.setProperty('--bg-avg-row', currentTheme.row_avg);
+        
+        if (currentTheme.type === 'light') {
+            r.style.setProperty('--bg-upload', 'rgba(255,255,255,0.5)');
+            r.style.setProperty('--border-glass', 'rgba(0,0,0,0.08)');
+            r.style.setProperty('--shadow-glow', 'rgba(0,0,0,0.05)');
+            r.style.setProperty('--bg-table-head', 'rgba(0,0,0,0.03)');
+            r.style.setProperty('--bg-table-hover', 'rgba(0,0,0,0.02)');
+        } else {
+            r.style.setProperty('--bg-upload', 'rgba(15, 23, 42, 0.3)');
+            r.style.setProperty('--border-glass', 'rgba(255,255,255,0.08)');
+            r.style.setProperty('--shadow-glow', `${currentTheme.primary}1A`);
+            r.style.setProperty('--bg-table-head', `${currentTheme.primary}0D`);
+            r.style.setProperty('--bg-table-hover', `${currentTheme.primary}08`);
+        }
+
+        Chart.defaults.color = currentTheme.sub;
+        Chart.defaults.borderColor = currentTheme.grid;
+
+        if (storedData) renderCharts(storedData);
+    }
+
+    // --- Main Logic ---
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--c-primary)'; dropZone.style.backgroundColor = 'var(--bg-table-head)'; });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = ''; dropZone.style.backgroundColor = ''; });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+    fileInput.addEventListener('change', (e) => { if(e.target.files.length) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => analyzeData(e.target.result);
+        reader.readAsText(file);
+    }
+
+    function analyzeData(content) {
+        const data = parseLog(content);
+        if (data.length === 0) { alert("Invalid Log File"); return; }
+        storedData = data;
+        renderDashboard(data);
+    }
+
+    function parseLog(content) {
+        const data = [];
+        const chunks = content.split("----- Preparing to measure channel:");
+        chunks.slice(1).forEach(chunk => {
+            const channel = chunk.match(/^\s*(\w+)\s*-----/)?.[1];
+            if (!channel) return;
+            const acceptedMatch = chunk.match(/Accepted: (\d+)\/(\d+)/);
+            const accepted = acceptedMatch ? parseInt(acceptedMatch[1]) : 0;
+            const total = acceptedMatch ? parseInt(acceptedMatch[2]) : 0;
+            
+            let finalSnr = 0;
+            const snrMatch = chunk.match(/Final SNR:\s*([\d.]+)\s*dB/);
+            if (snrMatch) {
+                finalSnr = parseFloat(snrMatch[1]);
+            } else if (channel.startsWith("SW")) {
+                const altSnrMatch = chunk.match(/SNR comparison:.*?median=([\d.]+)\s*dB/) || chunk.match(/SNR comparison:.*?mean=([\d.]+)\s*dB/);
+                if (altSnrMatch) finalSnr = parseFloat(altSnrMatch[1]);
+            }
+
+            let baseSnr = 0;
+            const baseSnrMatch = chunk.match(/Base SNR:\s*([\d.]+)\s*dB/);
+            if (baseSnrMatch) baseSnr = parseFloat(baseSnrMatch[1]);
+            else { const best = chunk.match(/Best single measurement:.*?SNR ([\d.]+)\s*dB/); if(best) baseSnr = parseFloat(best[1]); }
+            
+            const peakJitterMatch = chunk.match(/Peak Jitter:\s*(\d+)\s*us\s*@\s*([\d.]+)\s*Hz/);
+            const peakJitter = peakJitterMatch ? parseInt(peakJitterMatch[1]) : 0;
+            const peakFreq = peakJitterMatch ? parseFloat(peakJitterMatch[2]) : 0;
+            const avgJitterMatch = chunk.match(/Average Jitter:\s*(\d+)\s*us/);
+            const avgJitter = avgJitterMatch ? parseInt(avgJitterMatch[1]) : 0;
+            const impulseMatch = chunk.match(/Estimated Impulse True Peak Time:\s*([\d.]+)\s*ms/);
+            const impulseTime = impulseMatch ? parseFloat(impulseMatch[1]) : 0;
+            
+            let polarity = "Normal";
+            if (chunk.includes("nverted") || chunk.includes("Reverse")) polarity = "Inverted";
+
+            if (finalSnr > 0) data.push({ channel, accepted, total, rejected: total - accepted, baseSnr, finalSnr, peakJitter, peakFreq, avgJitter, impulseTime, polarity });
+        });
+        return data;
+    }
+
+    function renderDashboard(data) {
+        document.getElementById('dashboard').classList.remove('hidden');
+        
+        // Filter out zero jitter entries for average calculation
+        const validJit = data.filter(d => d.avgJitter > 0);
+        const avgJit = validJit.length ? validJit.reduce((s,d)=>s+d.avgJitter,0)/validJit.length : 0;
+        
+        const avgSNR = data.reduce((s,d)=>s+d.finalSnr,0)/data.length;
+        const totRej = data.reduce((s,d)=>s+d.rejected,0);
+        const swCount = data.filter(d => d.channel.startsWith('SW')).length;
+        const totImpulse = data.reduce((s,d)=>s+d.impulseTime,0);
+
+        document.getElementById('val_avg_snr').innerText = avgSNR.toFixed(1) + " dB";
+        document.getElementById('val_sys_jitter').innerText = avgJit.toFixed(0) + " us";
+        document.getElementById('val_tot_rej').innerText = totRej;
+        document.getElementById('val_sw_count').innerText = swCount;
+        document.getElementById('val_tot_impulse').innerText = totImpulse.toFixed(1);
+
+        let score = 100;
+        if(avgSNR < 52) score -= (52 - avgSNR)*2;
+        if(avgJit > 30) score -= (avgJit - 30)*0.5;
+        score -= totRej;
+        score = Math.max(0, Math.min(100, Math.round(score)));
+
+        let rank = 'B'; if(score >= 95) rank = 'S CLASS'; else if(score >= 85) rank = 'A CLASS'; else if(score >= 75) rank = 'B CLASS'; else rank = 'C CLASS';
+
+        document.getElementById('scoreValue').innerText = score;
+        document.getElementById('rankBadge').innerText = rank;
+
+        let summaryHTML = "";
+        const sumItem = (icon, text) => `<div class="summary-item"><div class="summary-icon">${icon}</div><div>${text}</div></div>`;
+
+        if(avgSNR > 52) summaryHTML += sumItem("📶", `<span class="zh txt-good">${getTextRaw('sum_good_snr')}</span><span class="en">Excellent Signal Quality (${avgSNR.toFixed(1)}dB avg).</span>`);
+        else if(avgSNR > 48) summaryHTML += sumItem("📶", `<span class="zh txt-info">${getTextRaw('sum_ok_snr')}</span><span class="en">Good Signal Quality (${avgSNR.toFixed(1)}dB avg).</span>`);
+        else summaryHTML += sumItem("⚠️", `<span class="zh txt-bad">${getTextRaw('sum_bad_snr')}</span><span class="en">High Noise Floor Detected.</span>`);
+
+        if(avgJit < 35) summaryHTML += sumItem("⏱️", `<span class="zh txt-good">${getTextRaw('sum_good_jit')}</span><span class="en">Rock Solid Clocking (${avgJit.toFixed(0)}us avg).</span>`);
+        else summaryHTML += sumItem("⚠️", `<span class="zh txt-warn">${getTextRaw('sum_warn_jit')}</span><span class="en">Jitter slightly elevated (${avgJit.toFixed(0)}us).</span>`);
+
+        if(totRej === 0) summaryHTML += sumItem("🛡️", `<span class="zh txt-good">${getTextRaw('sum_good_rej')}</span><span class="en">Perfect Data Integrity.</span>`);
+        else summaryHTML += sumItem("🌩️", `<span class="zh txt-bad">${totRej} ${getTextRaw('sum_bad_rej')}</span><span class="en">${totRej} measurements rejected.</span>`);
+
+        document.getElementById('summaryText').innerHTML = summaryHTML;
+        renderCharts(data);
+        renderTable(data);
+    }
+
+    let charts = {};
+    function renderCharts(data) {
+        const labels = data.map(d => d.channel);
+        const options = { 
+            responsive: true, maintainAspectRatio: false, 
+            plugins: { legend: { labels: { color: currentTheme.sub } } },
+            scales: {
+                x: { grid: { color: currentTheme.grid }, ticks: { color: currentTheme.sub } },
+                y: { grid: { color: currentTheme.grid }, ticks: { color: currentTheme.sub } }
+            }
+        };
+
+        const createChart = (id, type, cfg) => {
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), { type, data: cfg.data, options: { ...options, ...cfg.options } });
+        };
+
+        createChart('chartAccept', 'bar', { data: { labels, datasets: [ { label: 'Accepted', data: data.map(d=>d.accepted), backgroundColor: '#4ade80' }, { label: 'Rejected', data: data.map(d=>d.rejected), backgroundColor: '#f87171' } ] }, options: { scales: { x: { stacked: true }, y: { stacked: true } } } });
+        createChart('chartSNR', 'bar', { data: { labels, datasets: [ { label: 'Base SNR', data: data.map(d=>d.baseSnr), backgroundColor: 'rgba(128,128,128,0.3)' }, { label: 'Final SNR', data: data.map(d=>d.finalSnr), backgroundColor: currentTheme.primary, borderColor: currentTheme.primary, borderWidth: 1 } ] }, options: { scales: { y: { min: 10 } } } });
+        createChart('chartAvgJitter', 'bar', { data: { labels, datasets: [{ label: 'Avg Jitter (us)', data: data.map(d=>d.avgJitter), backgroundColor: data.map(d => d.avgJitter < 40 ? '#4ade80' : (d.avgJitter < 70 ? '#fbbf24' : '#f87171')) }] } });
+        createChart('chartPeakJitter', 'bar', { data: { labels, datasets: [ { label: 'Peak Jitter (us)', data: data.map(d=>d.peakJitter), backgroundColor: currentTheme.secondary, yAxisID: 'y' }, { type: 'line', label: 'Frequency (Hz)', data: data.map(d=>d.peakFreq), borderColor: currentTheme.primary, yAxisID: 'y1' } ] }, options: { scales: { y: { position: 'left', title: {display:true, text:'us', color:currentTheme.sub} }, y1: { position: 'right', grid: {drawOnChartArea:false}, title: {display:true, text:'Hz', color:currentTheme.sub} } } } });
+        createChart('chartImpulse', 'line', { data: { labels, datasets: [{ label: 'Impulse Time (ms)', data: data.map(d=>d.impulseTime), borderColor: currentTheme.success || '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.1)', fill: true, tension: 0.3 }] } });
+    }
+
+    function renderTable(data) {
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+        
+        data.forEach(d => {
+            const tr = document.createElement('tr');
+            const gain = d.finalSnr - d.baseSnr;
+            
+            // Multilingual Channel Name Logic
+            let chName = d.channel;
+            if (channelNames[d.channel]) {
+                chName = channelNames[d.channel][currentLang] || channelNames[d.channel]['en'];
+            } else if (d.channel.startsWith('SW')) {
+                const num = d.channel.replace('SW', '');
+                const base = channelNames['SW'][currentLang] || channelNames['SW']['en'];
+                chName = `${base} ${num}`;
+            }
+
+            const statusBadge = d.rejected === 0 
+                ? `<span class="badge" style="background:${currentTheme.type==='dark'?'rgba(74,222,128,0.1)':'#dcfce7'}; color:#16a34a; border:1px solid #16a34a">${getTextRaw('perfect')}</span>`
+                : `<span class="badge" style="background:${currentTheme.type==='dark'?'rgba(251,191,36,0.1)':'#fef9c3'}; color:#d97706; border:1px solid #d97706">${getTextRaw('warn')}</span>`;
+
+            tr.innerHTML = `
+                <td>
+                    <span class="lang-primary">${chName}</span>
+                    <span class="lang-sub" style="color:var(--c-primary); font-weight:bold;">${d.channel}</span>
+                </td>
+                <td>${statusBadge}</td>
+                <td><span style="color:var(--text-main)">${d.accepted}</span> / <span style="color:var(--text-sub)">${d.total}</span></td>
+                <td style="color:${d.rejected>0?'var(--c-danger)':'var(--text-sub)'}">${d.rejected}</td>
+                <td>${d.baseSnr.toFixed(1)}</td>
+                <td style="color:var(--c-primary); font-weight:bold;">${d.finalSnr.toFixed(1)}</td>
+                <td style="color:${gain>=0?'var(--c-success)':'var(--c-danger)'}">${gain>=0?'+':''}${gain.toFixed(1)}</td>
+                <td>${d.peakJitter}</td>
+                <td class="mono" style="color:var(--c-secondary)">${d.peakFreq}</td>
+                <td style="color:${d.avgJitter<40?'var(--c-success)':(d.avgJitter<70?'var(--c-warning)':'var(--c-danger)')}; font-weight:bold;">${d.avgJitter}</td>
+                <td>${d.polarity === 'Normal' ? getTextRaw('normal') : `<span style="color:var(--c-danger)">${getTextRaw('inverted')}</span>`}</td>
+                <td class="mono">${d.impulseTime.toFixed(3)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const swData = data.filter(d => d.channel.includes("SW"));
+        const avg = (arr, key) => {
+            if (key === 'peakJitter' || key === 'avgJitter') {
+                const valid = arr.filter(d => d[key] > 0);
+                return valid.length ? valid.reduce((a,b)=>a+b[key],0)/valid.length : 0;
+            }
+            return arr.length ? arr.reduce((a,b)=>a+b[key],0)/arr.length : 0;
+        };
+        
+        const renderSummary = (className, titleKey, sourceData) => {
+            if (sourceData.length === 0) return;
+            const tr = document.createElement('tr');
+            tr.className = className;
+            const mBase = avg(sourceData, 'baseSnr').toFixed(1);
+            const mFinal = avg(sourceData, 'finalSnr').toFixed(1);
+            const mGain = (mFinal - mBase).toFixed(1);
+            const mPkJit = avg(sourceData, 'peakJitter').toFixed(0);
+            const mAvgJit = avg(sourceData, 'avgJitter').toFixed(0);
+            const mImp = avg(sourceData, 'impulseTime').toFixed(3);
+            tr.innerHTML = `<td colspan="4" style="text-align:right; padding-right:20px;">${renderText(titleKey)}</td><td>${mBase}</td><td>${mFinal}</td><td>${mGain}</td><td>${mPkJit}</td><td>-</td><td>${mAvgJit}</td><td>-</td><td>${mImp}</td>`;
+            tbody.appendChild(tr);
+        };
+
+        if(swData.length > 0) renderSummary('row-sw', 'row_sw', swData);
+        renderSummary('row-avg', 'row_avg', data);
+    }
+
+    applyTheme('dark_default');
+    setLanguage('en'); 
+</script>
+
+</body>
+</html>
