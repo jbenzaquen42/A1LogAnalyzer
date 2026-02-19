@@ -1,0 +1,2336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A1 Evo Session Log Analyzer (Multi-Mic)</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg-body:#0b1220;
+      --bg-panel:rgba(18, 28, 48, 0.78);
+      --bg-upload:rgba(11, 18, 32, 0.35);
+      --c-primary:#39c6ff;
+      --c-secondary:#8b7cff;
+      --c-success:#4ade80;
+      --c-warning:#fbbf24;
+      --c-danger:#fb7185;
+      --text-main:#e6eefc;
+      --text-sub:#9ab0d1;
+      --border-glass:rgba(255,255,255,0.08);
+      --border-hover:rgba(57,198,255,0.30);
+      --shadow-glow:rgba(57,198,255,0.12);
+      --bg-table-head:rgba(57,198,255,0.06);
+      --bg-table-hover:rgba(57,198,255,0.04);
+      --bg-muted:rgba(255,255,255,0.03);
+    }
+
+    body{
+      background-color:var(--bg-body);
+      background-image:
+        radial-gradient(circle at 12% 35%, rgba(139,124,255,0.25) 0%, transparent 34%),
+        radial-gradient(circle at 88% 22%, rgba(57,198,255,0.25) 0%, transparent 34%),
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size:100% 100%,100% 100%, 42px 42px, 42px 42px;
+      background-attachment:fixed;
+      color:var(--text-main);
+      font-family:'Rajdhani',sans-serif;
+      margin:0;
+      padding:0;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+    }
+
+    /* Make container responsive: remove fixed max width */
+    .container{max-width:100%;width:100%;padding:18px;box-sizing:border-box;}
+    .header{padding:14px 10px 18px;text-align:center;}
+    .header h1{
+      margin:0;
+      font-size:2.15rem;
+      letter-spacing:.8px;
+      background:linear-gradient(90deg,var(--c-primary),var(--c-secondary));
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+      text-shadow:0 0 18px rgba(57,198,255,0.20);
+    }
+    .header .sub{margin-top:8px;color:var(--text-sub);font-size:1.02rem;}
+
+    .panel{
+      background:var(--bg-panel);
+      border-radius:16px;
+      border:1px solid var(--border-glass);
+      box-shadow:0 10px 34px rgba(0,0,0,0.28), 0 0 16px var(--shadow-glow);
+      backdrop-filter:blur(10px);
+      padding:18px;
+      margin-bottom:16px;
+    }
+
+    .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+    .spacer{flex:1;}
+    .btn, select{
+      background:rgba(5,10,18,0.55);
+      color:var(--text-main);
+      border:1px solid var(--border-glass);
+      border-radius:12px;
+      padding:10px 12px;
+      font-family:'Rajdhani',sans-serif;
+      font-size:0.98rem;
+      cursor:pointer;
+      transition:.15s ease;
+      outline:none;
+    }
+    .btn:hover, select:hover{border-color:var(--border-hover);}
+    .btn.primary{
+      background:rgba(57,198,255,0.14);
+      border-color:rgba(57,198,255,0.30);
+      color:var(--c-primary);
+      font-weight:700;
+    }
+
+    .upload{
+      background:var(--bg-upload);
+      border:2px dashed var(--border-glass);
+      border-radius:14px;
+      padding:22px;
+      text-align:center;
+      cursor:pointer;
+      transition:.2s ease;
+    }
+    .upload:hover{border-color:var(--c-primary);background:rgba(57,198,255,0.06);}
+    .upload.drag{border-color:var(--c-primary);background:rgba(57,198,255,0.11);transform:scale(1.01);}
+    .upload .icon{font-size:2.7rem;color:var(--c-primary);line-height:1;margin-bottom:10px;}
+    .upload .t1{font-size:1.15rem;}
+    .upload .t2{font-size:.9rem;color:var(--text-sub);margin-top:6px;}
+    #fileInput{display:none;}
+
+    .info{
+      margin-top:12px;
+      padding:12px 14px;
+      background:rgba(5,10,18,0.35);
+      border:1px solid var(--border-glass);
+      border-radius:14px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:.84rem;
+      color:var(--text-sub);
+      line-height:1.55;
+    }
+    .info strong{color:var(--text-main);font-weight:700;}
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:16px;
+    }
+    @media (min-width:950px){
+      .grid{grid-template-columns:1fr 1fr;}
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(145px, 1fr));
+      gap:10px;
+    }
+    .stat{
+      background:rgba(5,10,18,0.35);
+      border:1px solid var(--border-glass);
+      border-radius:14px;
+      padding:12px 12px 10px;
+      text-align:center;
+    }
+    .stat .v{font-size:1.75rem;font-weight:800;margin:2px 0 2px;}
+    .stat .k{font-size:.88rem;color:var(--text-sub);}
+    .stat.primary .v{color:var(--c-primary);}
+    .stat.success .v{color:var(--c-success);}
+    .stat.warn .v{color:var(--c-warning);}
+    .stat.danger .v{color:var(--c-danger);}
+
+    .title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:0 0 10px 0;
+      font-size:1.1rem;
+      letter-spacing:.3px;
+    }
+    .pill{
+      padding:3px 9px;
+      border-radius:999px;
+      border:1px solid var(--border-glass);
+      background:rgba(5,10,18,0.28);
+      color:var(--text-sub);
+      font-size:.78rem;
+      font-family:'JetBrains Mono',monospace;
+    }
+
+    /* Make chart container height responsive using viewport units and allow more space for legibility */
+    .chartWrap{position:relative;min-height:360px;height:50vh;width:100%;overflow:hidden;}
+    .chartWrap.tall{min-height:420px;height:60vh;}
+
+    /* Toggle bar for charts */
+    .toggle-group {
+      margin: 6px 0 4px;
+      display: flex;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      flex-wrap: wrap;
+    }
+    .toggle-group label { cursor:pointer; }
+    .toggle-group input { margin-right: 4px; }
+
+    /* Channel overview table styles */
+    #channelOverview table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #channelOverview th, #channelOverview td {
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    #channelOverview th {
+      border-bottom: 1px solid var(--border-glass);
+      background: rgba(255,255,255,0.03);
+      color: var(--text);
+    }
+    #channelOverview tr:nth-child(odd) {
+      background: rgba(255,255,255,0.02);
+    }
+    #channelOverview .high {
+      color: #00aa64;
+    }
+    #channelOverview .medium {
+      color: #ffc850;
+    }
+    #channelOverview .low {
+      color: #ff6464;
+    }
+
+    .tableWrap{overflow:auto;border-radius:14px;border:1px solid var(--border-glass);}
+    table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:.82rem;}
+    th,td{padding:10px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.05);white-space:nowrap;}
+    th{position:sticky;top:0;background:var(--bg-table-head);color:var(--c-primary);z-index:5;}
+    tr:hover{background:var(--bg-table-hover);}
+    .muted{color:var(--text-sub);}
+    .tag{
+      display:inline-block;
+      padding:2px 7px;
+      border-radius:999px;
+      border:1px solid var(--border-glass);
+      background:rgba(5,10,18,0.28);
+      color:var(--text-sub);
+      font-size:.74rem;
+    }
+    .tag.ok{color:var(--c-success);border-color:rgba(74,222,128,0.35);background:rgba(74,222,128,0.08);}
+    .tag.warn{color:var(--c-warning);border-color:rgba(251,191,36,0.35);background:rgba(251,191,36,0.08);}
+    .tag.bad{color:var(--c-danger);border-color:rgba(251,113,133,0.35);background:rgba(251,113,133,0.08);}
+
+    /* Styling for derived metric columns to visually separate them */
+    th.derived, td.derived {
+      border-left:1px solid var(--border-hover);
+      background:rgba(57,198,255,0.04);
+    }
+
+    /* Grade tags: reuse tag styles with extra emphasis */
+    .tag.grade-A{ color:var(--c-success); border-color:rgba(74,222,128,0.45); background:rgba(74,222,128,0.12); }
+    /* Additional grade styles.  These reuse the base tag styles and adjust colors to reflect performance.
+       Grade B slightly reduces saturation compared to A; C uses warning colour; D uses a deeper orange; F uses the danger colour. */
+    .tag.grade-B{ color:var(--c-success); border-color:rgba(74,222,128,0.35); background:rgba(74,222,128,0.08); }
+    .tag.grade-C{ color:var(--c-warning); border-color:rgba(251,191,36,0.45); background:rgba(251,191,36,0.12); }
+    .tag.grade-D{ color:var(--c-warning); border-color:rgba(251,191,36,0.55); background:rgba(251,191,36,0.18); }
+    .tag.grade-F{ color:var(--c-danger); border-color:rgba(251,113,133,0.45); background:rgba(251,113,133,0.12); }
+    .tag.grade-B{ color:var(--c-primary); border-color:rgba(57,198,255,0.45); background:rgba(57,198,255,0.12); }
+    .tag.grade-C{ color:var(--c-warning); border-color:rgba(251,191,36,0.45); background:rgba(251,191,36,0.12); }
+    .tag.grade-D{ color:var(--c-danger); border-color:rgba(251,113,133,0.45); background:rgba(251,113,133,0.12); }
+    .tag.grade-F{ color:var(--c-danger); border-color:rgba(251,113,133,0.55); background:rgba(251,113,133,0.20); }
+
+    .diag{
+      padding:12px 14px;
+      background:rgba(5,10,18,0.35);
+      border:1px solid var(--border-glass);
+      border-radius:14px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:.82rem;
+      line-height:1.55;
+      color:var(--text-sub);
+    }
+    .diag .item{margin:6px 0;}
+    .diag .sev-ok{color:var(--c-success);}
+    .diag .sev-warn{color:var(--c-warning);}
+    .diag .sev-bad{color:var(--c-danger);}
+
+    .footer{
+      padding:14px 0 24px;
+      color:var(--text-sub);
+      font-family:'JetBrains Mono',monospace;
+      font-size:.78rem;
+      text-align:center;
+      opacity:.85;
+    }
+
+    /* Tabs for loaded files */
+    .tab {
+      padding:6px 12px;
+      margin-right:8px;
+      border-bottom:2px solid transparent;
+      cursor:pointer;
+      background:none;
+      color:var(--text-sub);
+      font-size:.9rem;
+    }
+    .tab.active {
+      color:var(--c-primary);
+      border-bottom-color:var(--c-primary);
+      font-weight:600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>A1 Evo Session Log Analyzer (Multi-Mic)</h1>
+      <div class="sub">Parses multi-position session logs; keeps per-position data, builds aggregates, and flags missing fields.</div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px;">
+        <select id="viewMode" title="Choose to view aggregated per‑channel results or individual microphone positions">
+          <option value="aggregate" title="Display per‑channel statistics averaged across mic positions">Aggregate (per channel)</option>
+          <option value="perpos" title="Display statistics for a single microphone position">Per mic position</option>
+        </select>
+
+        <select id="metricMode" title="Select the metric to visualise in the heatmap and tables">
+          <option value="finalSnr" title="Show final SNR for each block">Final SNR (dB)</option>
+          <option value="snrGain" title="Show gain from base to final SNR">SNR Gain (dB)</option>
+          <option value="acceptRate" title="Show percentage of accepted/correlated sweeps">Accept / Correlation rate</option>
+          <option value="avgJitter" title="Show average jitter across sweeps">Avg Jitter (us)</option>
+          <option value="peakJitter" title="Show peak jitter across sweeps">Peak Jitter (us)</option>
+          <option value="peakToSilence" title="Show peak‑to‑silence ratio">Peak-to-Silence (dB)</option>
+          <option value="peakMag" title="Show peak magnitude percentage">Peak Magnitude (%)</option>
+          <option value="impulseTime" title="Show impulse true peak time">Impulse True Peak Time (ms)</option>
+        </select>
+
+        <select id="posFilter" class="hidden"></select>
+
+        <!-- Combine positions toggle: when checked, aggregate per‑channel metrics are used instead of per‑position data -->
+        <label style="display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-sub);" title="Combine results from all positions into per‑channel averages">
+          <input type="checkbox" id="combineToggle" style="accent-color:var(--c-primary);" />
+          Combine positions
+        </label>
+
+        <div class="spacer"></div>
+
+        <button class="btn primary" id="btnReset" title="Clear all loaded files and reset the interface">Reset</button>
+        <button class="btn" id="btnExport" title="Download the analysis tables as a CSV file">Export CSV</button>
+        <button class="btn" id="btnSavePng" title="Save all visible charts to a single PNG image">Save Charts</button>
+        <button class="btn" id="btnExportMeas" style="display:none;" title="Download the currently loaded measurement data as plain text">Export Measurement</button>
+      </div>
+
+      <div id="uploadArea" class="upload" title="Click or drag files here to load session logs or REW measurements">
+        <div class="icon">⬆</div>
+        <div class="t1">Click or drag & drop your session log or measurement (.txt/.log)</div>
+        <div class="t2">Log support: “--- Preparing for Microphone Position … ---” and “-> Averaging … for CH …” blocks. Measurement support: REW “* Measurement data…” exports.</div>
+        <!-- Allow multiple files to be selected at once -->
+        <input type="file" id="fileInput" accept=".txt,.log" multiple />
+      </div>
+      <!-- Tab bar to switch between loaded files. Hidden until files are loaded -->
+      <div id="fileTabs" class="row" style="display:none;margin-top:12px;flex-wrap:wrap;"></div>
+
+      <div id="logInfo" class="info" style="display:none;"></div>
+    </div>
+
+    <div id="dashboard" class="grid" style="display:none;">
+      <div class="panel">
+        <div class="title">Summary <span id="pillSummary" class="pill">—</span></div>
+        <div id="stats" class="stats"></div>
+        <div style="height:12px;"></div>
+        <div class="title">Diagnostics <span class="pill">rules-based</span></div>
+        <div id="diagnostics" class="diag"></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">SNR Overview <span id="pillSnr" class="pill">—</span></div>
+        <!-- Toggles to show/hide final and baseline SNR datasets -->
+        <div class="toggle-group">
+          <label title="Show or hide the bar series for final SNR across positions"><input type="checkbox" id="showFinalSnr" checked /> Final SNR</label>
+          <label title="Show or hide the bar/line series for baseline or min/max SNR"><input type="checkbox" id="showBaseSnr" checked /> Base / Min/Max</label>
+        </div>
+        <div class="chartWrap"><canvas id="chartSnr"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">Acceptance / Correlation <span id="pillAcc" class="pill">—</span></div>
+        <div class="chartWrap"><canvas id="chartAcc"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">Jitter (available rows only) <span id="pillJit" class="pill">—</span></div>
+        <!-- Toggles to show/hide average and peak jitter datasets -->
+        <div class="toggle-group">
+          <label title="Show or hide the line for average jitter across sweeps"><input type="checkbox" id="showAvgJit" checked /> Avg Jitter</label>
+          <label title="Show or hide the line for peak jitter across sweeps"><input type="checkbox" id="showPeakJit" checked /> Peak Jitter</label>
+        </div>
+        <div class="chartWrap"><canvas id="chartJitter"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">SNR vs Acceptance <span id="pillScatter" class="pill">scatter</span></div>
+        <div class="chartWrap"><canvas id="chartScatter"></canvas></div>
+      </div>
+
+      <!-- Histogram panel for distribution of Final SNR across all per-position rows -->
+      <div class="panel">
+        <div class="title">SNR Distribution <span id="pillHist" class="pill">histogram</span></div>
+        <div class="chartWrap"><canvas id="chartHist"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">Position Heatmap <span id="pillHeat" class="pill">table</span></div>
+        <div class="tableWrap"><table id="heatTable"></table></div>
+      </div>
+
+      <div class="panel">
+        <div class="title">Detailed Table <span id="pillTable" class="pill">—</span></div>
+        <div class="tableWrap"><table id="detailTable"></table></div>
+      </div>
+      <!-- New panel summarizing channels with key metrics -->
+      <div class="panel" id="channelOverview" style="display:none;">
+        <div class="title">Channel Overview</div>
+        <div id="channelTable"></div>
+      </div>
+    </div>
+
+    <!-- Measurement panel: shown when a REW measurement file is loaded -->
+    <div id="measurementPanel" class="grid" style="display:none;">
+      <div class="panel">
+        <div class="title">Measurement Summary <span id="pillMeas" class="pill">—</span></div>
+        <div id="measStats" class="stats"></div>
+      </div>
+      <div class="panel">
+        <div class="title">Frequency Response <span id="pillMeasChart" class="pill">SPL vs Freq</span></div>
+        <div class="chartWrap tall"><canvas id="chartMeas"></canvas></div>
+      </div>
+    </div>
+
+    <div class="footer">Supports multiple files. Chart.js via CDN.</div>
+  </div>
+
+<script>
+  // ---------- State ----------
+  let parsed = null;
+  let charts = { snr:null, acc:null, jit:null, scatter:null, hist:null, meas:null };
+
+  // Holds parsed measurement data when a REW measurement file is loaded.  Set to null for log files.
+  let measurement = null;
+
+  // Sorting state for the detailed aggregate table. If key is null, default channel sort is used.
+  let detailSort = { key: null, asc: true };
+
+  // Multi-file support: store the list of loaded File objects and track the active file index.
+  let loadedFiles = [];
+  let activeFileIdx = null;
+
+  // ---------- Utils ----------
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
+
+  const toNum = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const avg = (arr) => {
+    const v = arr.filter(x => Number.isFinite(x));
+    if (!v.length) return null;
+    return v.reduce((a,b)=>a+b,0) / v.length;
+  };
+
+  const stdev = (arr) => {
+    const v = arr.filter(x => Number.isFinite(x));
+    if (v.length < 2) return null;
+    const m = avg(v);
+    const s2 = v.reduce((a,b)=>a + (b-m)*(b-m), 0) / (v.length - 1);
+    return Math.sqrt(s2);
+  };
+
+  const minv = (arr) => {
+    const v = arr.filter(x => Number.isFinite(x));
+    if (!v.length) return null;
+    return Math.min(...v);
+  };
+
+  const maxv = (arr) => {
+    const v = arr.filter(x => Number.isFinite(x));
+    if (!v.length) return null;
+    return Math.max(...v);
+  };
+
+  const pct = (a,b) => {
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+    return (a / b) * 100;
+  };
+
+  const fmt = (n, d=1) => (Number.isFinite(n) ? n.toFixed(d) : "—");
+
+  function destroyCharts() {
+    for (const k of Object.keys(charts)) {
+      if (charts[k]) { charts[k].destroy(); charts[k] = null; }
+    }
+  }
+
+  // ---------- Measurement parsing & rendering ----------
+  /**
+   * Parse a REW measurement export.  Ignores header lines beginning with '*' and any blank lines.
+   * Returns an object containing an array of points and basic summary statistics.
+   * Each point has properties: freq (Hz), spl (dB), and phase (deg).  Only lines
+   * with at least two numeric values (freq and SPL) are considered; phase is optional.
+   * @param {string} content Raw file text
+   */
+  function parseMeasurement(content) {
+    const lines = String(content || "").split(/\r?\n/);
+    const points = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('*') || trimmed.startsWith(';') || trimmed.startsWith('#')) continue;
+      const parts = trimmed.split(/[,\s]+/).filter(Boolean);
+      if (parts.length < 2) continue;
+      const freq = toNum(parts[0]);
+      const spl = toNum(parts[1]);
+      const phase = parts.length >= 3 ? toNum(parts[2]) : null;
+      if (freq != null && spl != null) {
+        points.push({ freq, spl, phase });
+      }
+    }
+    if (!points.length) return null;
+    const freqs = points.map(p => p.freq).filter(Number.isFinite);
+    const spls = points.map(p => p.spl).filter(Number.isFinite);
+    const minFreq = minv(freqs);
+    const maxFreq = maxv(freqs);
+    const minSpl = minv(spls);
+    const maxSpl = maxv(spls);
+    const meanSpl = avg(spls);
+    const dynamicRange = (Number.isFinite(maxSpl) && Number.isFinite(minSpl)) ? (maxSpl - minSpl) : null;
+    // simple RMS of SPL values (treat as linear amplitude relative to reference).  Convert dB to linear, compute RMS, convert back to dB.
+    let rmsSpl = null;
+    if (spls.length) {
+      const lin = spls.map(v => Math.pow(10, v / 20));
+      const meanSq = lin.reduce((a,b) => a + b*b, 0) / lin.length;
+      rmsSpl = 20 * Math.log10(Math.sqrt(meanSq));
+    }
+    return {
+      points,
+      minFreq,
+      maxFreq,
+      minSpl,
+      maxSpl,
+      meanSpl,
+      dynamicRange,
+      rmsSpl,
+      sampleCount: points.length
+    };
+  }
+
+  /**
+   * Render summary information about a measurement file into the info panel.
+   * @param {File} file
+   * @param {object} meas Parsed measurement object
+   */
+  function showMeasInfo(file, meas) {
+    const div = document.getElementById("logInfo");
+    div.style.display = "";
+    div.innerHTML = `
+      <div><strong>Measurement file:</strong> ${esc(file.name)}</div>
+      <div><strong>Size:</strong> ${file.size.toLocaleString()} bytes</div>
+      <div><strong>Samples:</strong> ${meas.sampleCount}</div>
+      <div><strong>Frequency range:</strong> ${fmt(meas.minFreq,1)} Hz – ${fmt(meas.maxFreq,1)} Hz</div>
+      <div><strong>SPL range:</strong> ${fmt(meas.minSpl,1)} dB – ${fmt(meas.maxSpl,1)} dB</div>
+      <div><strong>Mean SPL:</strong> ${fmt(meas.meanSpl,1)} dB</div>
+      <div><strong>Dynamic range:</strong> ${Number.isFinite(meas.dynamicRange) ? fmt(meas.dynamicRange,1) + ' dB' : '—'}</div>
+      <div><strong>RMS SPL:</strong> ${Number.isFinite(meas.rmsSpl) ? fmt(meas.rmsSpl,1) + ' dB' : '—'}</div>
+    `;
+  }
+
+  /**
+   * Draw a frequency response line chart for the parsed measurement data.
+   * Plots SPL vs frequency on a logarithmic x-axis; if phase is present for more than half of samples,
+   * also plots phase on a secondary y-axis.
+   * @param {object} meas Parsed measurement object
+   */
+  function renderMeasurementChart(meas) {
+    // Destroy existing measurement chart if any
+    if (charts.meas) { charts.meas.destroy(); charts.meas = null; }
+    const ctx = document.getElementById('chartMeas').getContext('2d');
+    const freqs = meas.points.map(p => p.freq);
+    const spls = meas.points.map(p => p.spl);
+    const phases = meas.points.map(p => (p.phase != null ? p.phase : null));
+    const phaseCount = phases.filter(x => Number.isFinite(x)).length;
+    const colorSub = getComputedStyle(document.documentElement).getPropertyValue('--text-sub');
+    const colorPrimary = getComputedStyle(document.documentElement).getPropertyValue('--c-primary');
+    const datasets = [];
+    datasets.push({
+      label: 'SPL (dB)',
+      data: spls,
+      borderColor: 'rgba(57,198,255,0.9)',
+      backgroundColor: 'rgba(57,198,255,0.2)',
+      pointRadius: 0,
+      tension: 0.2,
+      yAxisID: 'spl',
+    });
+    if (phaseCount > meas.points.length / 2) {
+      datasets.push({
+        label: 'Phase (°)',
+        data: phases,
+        borderColor: 'rgba(139,124,255,0.9)',
+        backgroundColor: 'rgba(139,124,255,0.2)',
+        pointRadius: 0,
+        tension: 0.2,
+        yAxisID: 'phase',
+      });
+    }
+    charts.meas = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: freqs,
+        datasets
+      },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          // show tooltips across datasets and disable point intersection requirement
+          interaction:{ mode:'index', intersect:false },
+          // Add extra bottom padding so axis titles are fully visible
+          layout:{ padding:{ bottom: 30 } },
+          scales: {
+            x: {
+              type:'logarithmic',
+              title: { display:true, text:'Frequency (Hz)', color: colorSub, font:{ size: 16 } },
+              ticks: {
+                color: colorSub,
+                font:{ size:13 },
+                callback: function(value, index) {
+                  // Show tick labels at 10^n values only
+                  const v = Number(value);
+                  const log = Math.log10(v);
+                  if (Math.abs(log - Math.round(log)) < 0.0001) return v.toFixed(0);
+                  return '';
+                }
+              },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            spl: {
+              type:'linear',
+              position:'left',
+              title:{ display:true, text:'SPL (dB)', color: colorSub, font:{ size: 16 } },
+              ticks:{ color: colorSub, font:{ size:13 } },
+              grid:{ color: 'rgba(255,255,255,0.05)' }
+            },
+            phase: {
+              type:'linear',
+              position:'right',
+              title:{ display:true, text:'Phase (°)', color: colorSub, font:{ size:16 } },
+              ticks:{ color: colorSub, font:{ size:13 } },
+              grid:{ drawOnChartArea:false }
+            }
+          },
+          plugins:{
+            legend:{ labels:{ color: colorSub, font:{ size:13 } } },
+            tooltip:{
+              mode:'index',
+              intersect:false,
+              callbacks:{
+                label: function(ctx) {
+                  const label = ctx.dataset.label || '';
+                  const val = ctx.parsed.y;
+                  return `${label}: ${Number.isFinite(val) ? fmt(val,2) : '—'}`;
+                }
+              }
+            },
+            title:{ display:true, text:'Frequency Response', color: colorSub, font:{ size:18, weight:'bold' } }
+          }
+        }
+      });
+  }
+
+  /**
+   * Build a text representation of measurement data.  Returns a string with space-separated columns.
+   * Includes frequency, SPL, and phase (if present).
+   * @param {object} meas
+   */
+  function buildMeasurementText(meas) {
+    const lines = [];
+    for (const p of meas.points) {
+      const parts = [];
+      parts.push(fmt(p.freq,6));
+      parts.push(fmt(p.spl,3));
+      if (Number.isFinite(p.phase)) parts.push(fmt(p.phase,3));
+      lines.push(parts.join(' '));
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Trigger download of a space-delimited text file representing the measurement.
+   */
+  function exportMeasurement() {
+    if (!measurement) return;
+    const text = buildMeasurementText(measurement);
+    const blob = new Blob([text], { type:'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:\-.]/g, '');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `measurement_export_${ts}.txt`);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- Parsing (tailored to your multi-mic log format) ----------
+  // Expected anchors (seen in your file):
+  //  - "--- Preparing for Microphone Position X of Y ---"
+  //  - "-> Averaging N sweeps for FL... Starting averaging for SPEAKER..."
+  //  - "MEASUREMENT AVERAGING RESULTS"
+  //  - either "Accepted: a/b" OR "Correlation Check: a/b passed"
+  //  - optional jitter lines; optional impulse/polarity
+  function parseLog(content) {
+    const text = String(content || "");
+    const results = [];
+
+    // Detect mic position blocks. If absent, treat as single position = 1.
+    const posRe = /---\s*Preparing\s+for\s+Microphone\s+Position\s+(\d+)\s+of\s+(\d+)\s*---/gi;
+    const posHits = [];
+    let m;
+    while ((m = posRe.exec(text)) !== null) {
+      posHits.push({ idx: m.index, pos: parseInt(m[1],10), total: parseInt(m[2],10) });
+    }
+
+    const segments = [];
+    if (posHits.length) {
+      for (let i=0;i<posHits.length;i++) {
+        const start = posHits[i].idx;
+        const end = (i+1<posHits.length) ? posHits[i+1].idx : text.length;
+        segments.push({ pos: posHits[i].pos, total: posHits[i].total, seg: text.slice(start, end) });
+      }
+    } else {
+      segments.push({ pos: 1, total: 1, seg: text });
+    }
+
+    // Within a segment, find channel averaging blocks.
+    // Capture from the "-> Averaging ..." line through before next "-> Averaging" OR next mic-position header OR end segment.
+    const chRe = /\n?\s*->\s*Averaging\s+\d+\s+sweeps\s+for\s+([A-Z0-9]+)\b[\s\S]*?(?=\n\s*->\s*Averaging\s+\d+\s+sweeps\s+for\s+[A-Z0-9]+\b|\n\s*---\s*Preparing\s+for\s+Microphone\s+Position\b|$)/gi;
+
+    for (const seg of segments) {
+      let cm;
+      while ((cm = chRe.exec(seg.seg)) !== null) {
+        const channel = cm[1];
+        const block = cm[0];
+
+        const resBlock = block.includes("MEASUREMENT AVERAGING RESULTS")
+          ? (block.split("MEASUREMENT AVERAGING RESULTS")[1] || "")
+          : block;
+
+        // Accepted/Total primary
+        let acc = null, tot = null;
+
+        let ma = resBlock.match(/Accepted:\s*(\d+)\/(\d+)/i) || block.match(/Accepted:\s*(\d+)\/(\d+)/i);
+        if (ma) { acc = parseInt(ma[1],10); tot = parseInt(ma[2],10); }
+
+        // Fallback correlation check
+        if (!ma) {
+          const mc = resBlock.match(/Correlation Check:\s*(\d+)\/(\d+)\s*passed/i) || block.match(/Correlation Check:\s*(\d+)\/(\d+)\s*passed/i);
+          if (mc) { acc = parseInt(mc[1],10); tot = parseInt(mc[2],10); }
+        }
+
+        // SNR
+        const baseSnr = toNum((resBlock.match(/Base SNR:\s*([\d.]+)\s*dB/i)?.[1]) ?? null);
+        const finalSnr = toNum((resBlock.match(/Final SNR:\s*([\d.]+)\s*dB/i)?.[1]) ?? null);
+
+        // Jitter (optional in your log; many blocks may omit)
+        const peakJitter = toNum((resBlock.match(/Peak Jitter:\s*(\d+)\s*us/i)?.[1]) ?? null);
+        const peakFreq = toNum((resBlock.match(/Peak Jitter:\s*\d+\s*us\s*@\s*([\d.]+)\s*Hz/i)?.[1]) ?? null);
+        const avgJitter = toNum((resBlock.match(/Average Jitter:\s*(\d+)\s*us/i)?.[1]) ?? null);
+
+        // Polarity / Impulse (optional)
+        const polarity = (resBlock.match(/Estimated polarity:\s*([A-Za-z]+)/i)?.[1]) ?? null;
+        const impulseTime = toNum((resBlock.match(/Estimated Impulse True Peak Time:\s*([\d.]+)\s*ms/i)?.[1]) ?? null);
+
+        // Additional useful lines that exist in your log (often)
+        const peakMag = toNum((resBlock.match(/Peak Magnitude:\s*([\d.]+)\s*%/i)?.[1]) ?? null);
+        const peakToSilence = toNum((resBlock.match(/Peak-to-Silence Ratio:\s*([\d.]+)\s*dB/i)?.[1]) ?? null);
+        const status = (resBlock.match(/Status:\s*(.+)/i)?.[1] || "").trim() || null;
+
+        // If a block has none of the useful signals, skip
+        const hasSignal =
+          Number.isFinite(baseSnr) || Number.isFinite(finalSnr) || Number.isFinite(peakJitter) ||
+          Number.isFinite(avgJitter) || Number.isFinite(impulseTime) || Number.isFinite(peakToSilence) ||
+          Number.isFinite(peakMag) || Number.isFinite(acc);
+
+        if (!hasSignal) continue;
+
+        results.push({
+          micPos: seg.pos,
+          micTotal: seg.total,
+          channel,
+          accepted: Number.isFinite(acc) ? acc : null,
+          total: Number.isFinite(tot) ? tot : null,
+          rejected: (Number.isFinite(acc) && Number.isFinite(tot)) ? Math.max(0, tot - acc) : null,
+          baseSnr, finalSnr,
+          peakJitter, peakFreq, avgJitter,
+          polarity, impulseTime,
+          peakMag, peakToSilence,
+          status
+        });
+      }
+    }
+
+    // If no channel blocks found, try legacy format: "----- Preparing to measure channel:" blocks
+    if (!results.length && text.includes("----- Preparing to measure channel:")) {
+      const chunks = text.split("----- Preparing to measure channel:");
+      for (const ch of chunks.slice(1)) {
+        const channel = ch.match(/^\s*(\w+)\s*-----/)?.[1] || null;
+        if (!channel) continue;
+
+        const resBlock = ch.includes("MEASUREMENT AVERAGING RESULTS")
+          ? (ch.split("MEASUREMENT AVERAGING RESULTS")[1] || "")
+          : ch;
+
+        let acc=null, tot=null;
+        let ma = resBlock.match(/Accepted:\s*(\d+)\/(\d+)/i) || ch.match(/Accepted:\s*(\d+)\/(\d+)/i);
+        if (ma) { acc = parseInt(ma[1],10); tot = parseInt(ma[2],10); }
+        if (!ma) {
+          const mc = resBlock.match(/Correlation Check:\s*(\d+)\/(\d+)\s*passed/i) || ch.match(/Correlation Check:\s*(\d+)\/(\d+)\s*passed/i);
+          if (mc) { acc = parseInt(mc[1],10); tot = parseInt(mc[2],10); }
+        }
+
+        results.push({
+          micPos: 1,
+          micTotal: 1,
+          channel,
+          accepted: Number.isFinite(acc) ? acc : null,
+          total: Number.isFinite(tot) ? tot : null,
+          rejected: (Number.isFinite(acc) && Number.isFinite(tot)) ? Math.max(0, tot - acc) : null,
+          baseSnr: toNum((resBlock.match(/Base SNR:\s*([\d.]+)\s*dB/i)?.[1]) ?? null),
+          finalSnr: toNum((resBlock.match(/Final SNR:\s*([\d.]+)\s*dB/i)?.[1]) ?? null),
+          peakJitter: toNum((resBlock.match(/Peak Jitter:\s*(\d+)\s*us/i)?.[1]) ?? null),
+          peakFreq: toNum((resBlock.match(/Peak Jitter:\s*\d+\s*us\s*@\s*([\d.]+)\s*Hz/i)?.[1]) ?? null),
+          avgJitter: toNum((resBlock.match(/Average Jitter:\s*(\d+)\s*us/i)?.[1]) ?? null),
+          polarity: (resBlock.match(/Estimated polarity:\s*([A-Za-z]+)/i)?.[1]) ?? null,
+          impulseTime: toNum((resBlock.match(/Estimated Impulse True Peak Time:\s*([\d.]+)\s*ms/i)?.[1]) ?? null),
+          peakMag: toNum((resBlock.match(/Peak Magnitude:\s*([\d.]+)\s*%/i)?.[1]) ?? null),
+          peakToSilence: toNum((resBlock.match(/Peak-to-Silence Ratio:\s*([\d.]+)\s*dB/i)?.[1]) ?? null),
+          status: (resBlock.match(/Status:\s*(.+)/i)?.[1] || "").trim() || null
+        });
+      }
+    }
+
+    // Derive micTotal if missing
+    const micTotal = segments.length ? (segments[0].total || segments.length) : 1;
+    return {
+      micTotal,
+      perPosition: results
+    };
+  }
+
+  function buildAggregates(perPosition) {
+    const channels = [...new Set(perPosition.map(r => r.channel))].sort((a,b)=>a.localeCompare(b));
+    const posCount = perPosition.reduce((m,r)=>Math.max(m, r.micPos || 1), 1);
+
+    const byCh = new Map();
+    for (const ch of channels) byCh.set(ch, []);
+    for (const row of perPosition) {
+      if (!byCh.has(row.channel)) byCh.set(row.channel, []);
+      byCh.get(row.channel).push(row);
+    }
+
+    const agg = [];
+    for (const ch of channels) {
+      const rows = byCh.get(ch) || [];
+      const accSum = rows.reduce((a,r)=>a + (Number.isFinite(r.accepted)?r.accepted:0), 0);
+      const totSum = rows.reduce((a,r)=>a + (Number.isFinite(r.total)?r.total:0), 0);
+
+      const baseArr = rows.map(r=>r.baseSnr).filter(Number.isFinite);
+      const finalArr = rows.map(r=>r.finalSnr).filter(Number.isFinite);
+      const gainArr = rows.map(r => (Number.isFinite(r.finalSnr) && Number.isFinite(r.baseSnr)) ? (r.finalSnr - r.baseSnr) : null).filter(Number.isFinite);
+
+      const avgJitArr = rows.map(r=>r.avgJitter).filter(Number.isFinite);
+      const peakJitArr = rows.map(r=>r.peakJitter).filter(Number.isFinite);
+
+      // Derive additional arrays and metrics
+      // Convert peak-to-peak jitter values to an RMS estimate using a crest factor.
+      // A timing jitter primer explains that peak-to-peak jitter can be approximated
+      // as crestFactor × RMS jitter for a target bit error rate. For BER = 10^-12, the
+      // crest factor is 14.069【502001124103289†L393-L415】. Invert this to estimate RMS
+      // from measured peak-to-peak values.
+      const crestFactor = 14.069;
+      const peakRmsArr = peakJitArr.map(p => p / crestFactor);
+
+      const peakToSilArr = rows.map(r=>r.peakToSilence).filter(Number.isFinite);
+      const peakMagArr = rows.map(r=>r.peakMag).filter(Number.isFinite);
+
+      const impArr = rows.map(r=>r.impulseTime).filter(Number.isFinite);
+
+      const polarityAnyInv = rows.some(r => String(r.polarity||"").toLowerCase().includes("invert") || String(r.polarity||"").toLowerCase().includes("neg"));
+
+      agg.push({
+        channel: ch,
+        positionsSeen: rows.length,
+        micPositions: posCount,
+        acceptedSum: totSum ? accSum : null,
+        totalSum: totSum || null,
+        acceptRate: (totSum ? (accSum / totSum) : null),
+        baseMean: avg(baseArr),
+        baseMin: minv(baseArr),
+        baseMax: maxv(baseArr),
+        finalMean: avg(finalArr),
+        finalMin: minv(finalArr),
+        finalMax: maxv(finalArr),
+        finalStdev: stdev(finalArr),
+        // Coefficient of variation (CV) of the final SNR array. Defined as the
+        // ratio of standard deviation to mean【73568935617619†L156-L183】.
+        finalCv: (Number.isFinite(avg(finalArr)) && Math.abs(avg(finalArr)) > 0 ? stdev(finalArr) / avg(finalArr) : null),
+        gainMean: avg(gainArr),
+        gainMin: minv(gainArr),
+        gainMax: maxv(gainArr),
+        avgJitterMean: avg(avgJitArr),
+        peakJitterMax: maxv(peakJitArr),
+        peakToSilenceMean: avg(peakToSilArr),
+        peakMagMean: avg(peakMagArr),
+        impulseMean: avg(impArr),
+        polarityFlag: polarityAnyInv ? "Inverted/Negative seen" : "—",
+        jitterCoverage: rows.length ? (avgJitArr.length / rows.length) : 0
+        ,
+        // Mean RMS jitter derived from peak-to-peak measurements (see crest factor above).
+        peakJitterRmsMean: avg(peakRmsArr),
+        // Pearson correlation coefficient between final SNR and acceptance rate. Uses
+        // the standard formula r = (n Σxy – Σx Σy) / sqrt((n Σx² – (Σx)²)(n Σy² – (Σy)²))【749429210532300†L430-L439】.
+        acceptSnrCorr: (() => {
+          const pairs = [];
+          for (const r of rows) {
+            if (Number.isFinite(r.finalSnr) && Number.isFinite(r.accepted) && Number.isFinite(r.total) && r.total !== 0) {
+              const rate = r.accepted / r.total;
+              pairs.push({ x: r.finalSnr, y: rate });
+            }
+          }
+          const n = pairs.length;
+          if (n < 2) return null;
+          let sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0, sumXY = 0;
+          for (const p of pairs) {
+            sumX += p.x;
+            sumY += p.y;
+            sumX2 += p.x * p.x;
+            sumY2 += p.y * p.y;
+            sumXY += p.x * p.y;
+          }
+          const num = n * sumXY - sumX * sumY;
+          const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+          if (!den || !isFinite(den)) return null;
+          return num / den;
+        })()
+        ,
+        // Letter grade based on final mean SNR and acceptance rate.
+        grade: (() => {
+          const fm = avg(finalArr);
+          const arate = (totSum ? (accSum / totSum) : null);
+          // Grade for final mean SNR (dB)
+          let gS = null;
+          if (Number.isFinite(fm)) {
+            if (fm >= 25) gS = 'A';
+            else if (fm >= 20) gS = 'B';
+            else if (fm >= 15) gS = 'C';
+            else if (fm >= 10) gS = 'D';
+            else gS = 'F';
+          }
+          // Grade for acceptance rate (0..1)
+          let gA = null;
+          if (arate != null) {
+            if (arate >= 0.8) gA = 'A';
+            else if (arate >= 0.6) gA = 'B';
+            else if (arate >= 0.4) gA = 'C';
+            else if (arate >= 0.2) gA = 'D';
+            else gA = 'F';
+          }
+          if (!gS && !gA) return '—';
+          if (!gS) return gA;
+          if (!gA) return gS;
+          // Choose the worse grade (higher letter means worse when comparing ASCII codes)
+          return (gS > gA ? gS : gA);
+        })()
+      });
+    }
+
+    return { channels, posCount, aggregate: agg };
+  }
+
+  // ---------- Rendering ----------
+  function showInfo(file, content, parsed, agg) {
+    const firstLine = (String(content).split(/\r?\n/).find(l => l.trim().length) || "").slice(0,160);
+    const totalRows = parsed.perPosition.length;
+    const micTotal = parsed.micTotal || agg.posCount || 1;
+    const channels = agg.channels.length;
+
+    const withAccepted = parsed.perPosition.filter(r => Number.isFinite(r.accepted) && Number.isFinite(r.total)).length;
+    const withJitter = parsed.perPosition.filter(r => Number.isFinite(r.avgJitter) || Number.isFinite(r.peakJitter)).length;
+    const withSNR = parsed.perPosition.filter(r => Number.isFinite(r.finalSnr) || Number.isFinite(r.baseSnr)).length;
+
+    const div = document.getElementById("logInfo");
+    div.style.display = "";
+    div.innerHTML = `
+      <div><strong>File:</strong> ${esc(file.name)}</div>
+      <div><strong>Size:</strong> ${file.size.toLocaleString()} bytes</div>
+      <div><strong>First line:</strong> ${esc(firstLine)}</div>
+      <div><strong>Mic positions detected:</strong> ${micTotal}</div>
+      <div><strong>Channels detected:</strong> ${channels}</div>
+      <div><strong>Per-position rows parsed:</strong> ${totalRows} (expected ≈ ${micTotal * channels})</div>
+      <div><strong>Rows w/ Accepted or Correlation:</strong> ${withAccepted}</div>
+      <div><strong>Rows w/ SNR:</strong> ${withSNR}</div>
+      <div><strong>Rows w/ Jitter:</strong> ${withJitter}</div>
+    `;
+  }
+
+  function renderStats(parsed, agg) {
+    const per = parsed.perPosition;
+    const a = agg.aggregate;
+
+    const micTotal = parsed.micTotal || agg.posCount || 1;
+    const channels = agg.channels.length;
+
+    const finalAll = per.map(r=>r.finalSnr).filter(Number.isFinite);
+    const gainAll = per.map(r => (Number.isFinite(r.finalSnr) && Number.isFinite(r.baseSnr)) ? (r.finalSnr - r.baseSnr) : null).filter(Number.isFinite);
+    const accAll = per.filter(r=>Number.isFinite(r.accepted) && Number.isFinite(r.total));
+    const accRateAll = accAll.length ? avg(accAll.map(r => r.accepted / r.total)) : null;
+
+    const avgJitAll = per.map(r=>r.avgJitter).filter(Number.isFinite);
+
+    // Compute additional global metrics
+    // 1) Coefficient of variation of all final SNR values: stdev/mean【73568935617619†L156-L183】.
+    const finalAllCv = (() => {
+      const m = avg(finalAll);
+      const s = stdev(finalAll);
+      return (Number.isFinite(m) && Math.abs(m) > 0 ? s / m : null);
+    })();
+
+    // 2) Pearson correlation between final SNR and acceptance rate across all rows. Uses the same formula as above【749429210532300†L430-L439】.
+    const acceptSnrCorrAll = (() => {
+      const pairs = [];
+      for (const r of per) {
+        if (Number.isFinite(r.finalSnr) && Number.isFinite(r.accepted) && Number.isFinite(r.total) && r.total !== 0) {
+          const rate = r.accepted / r.total;
+          pairs.push({ x: r.finalSnr, y: rate });
+        }
+      }
+      const n = pairs.length;
+      if (n < 2) return null;
+      let sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0, sumXY = 0;
+      for (const p of pairs) {
+        sumX += p.x;
+        sumY += p.y;
+        sumX2 += p.x * p.x;
+        sumY2 += p.y * p.y;
+        sumXY += p.x * p.y;
+      }
+      const num = n * sumXY - sumX * sumY;
+      const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+      if (!den || !isFinite(den)) return null;
+      return num / den;
+    })();
+
+    // 3) Mean RMS jitter across all peak jitter measurements. Use crest factor conversion as above.
+    const crestFactor = 14.069;
+    const peakJitAll = per.map(r => r.peakJitter).filter(Number.isFinite);
+    const peakRmsAll = peakJitAll.map(p => p / crestFactor);
+    const rmsJitAllMean = avg(peakRmsAll);
+
+    const bestCh = a.slice().sort((x,y)=> (y.finalMean??-1) - (x.finalMean??-1))[0] || null;
+    const worstCh = a.slice().filter(x=>Number.isFinite(x.finalMean)).sort((x,y)=> (x.finalMean??1e9) - (y.finalMean??1e9))[0] || null;
+
+    const cards = [
+      { cls:"primary", v: channels, k:"Channels" },
+      { cls:"primary", v: micTotal, k:"Mic positions" },
+      { cls:"success", v: fmt(avg(finalAll),1) + " dB", k:"Avg Final SNR (all rows)" },
+      { cls:"warn", v: fmt(avg(gainAll),1) + " dB", k:"Avg SNR Gain (all rows)" },
+      { cls:"primary", v: (accRateAll==null ? "—" : fmt(accRateAll*100,1)+"%"), k:"Avg Accept/Correlation rate" },
+      { cls:"warn", v: (avgJitAll.length ? fmt(avg(avgJitAll),0)+" us" : "—"), k:"Avg Avg-Jitter (rows w/ jitter)" },
+      { cls:"success", v: (bestCh && Number.isFinite(bestCh.finalMean)) ? (bestCh.channel + " (" + fmt(bestCh.finalMean,1) + ")") : "—", k:"Best channel (Final mean)" },
+      { cls:"danger", v: (worstCh && Number.isFinite(worstCh.finalMean)) ? (worstCh.channel + " (" + fmt(worstCh.finalMean,1) + ")") : "—", k:"Worst channel (Final mean)" },
+      // Additional summary cards
+      { cls:"warn", v: (finalAllCv == null ? "—" : fmt(finalAllCv,2)), k:"Global Final CV" },
+      { cls:"warn", v: (acceptSnrCorrAll == null ? "—" : fmt(acceptSnrCorrAll,2)), k:"SNR vs Accept r" },
+      { cls:"warn", v: (Number.isFinite(rmsJitAllMean) ? fmt(rmsJitAllMean,2) + " us" : "—"), k:"Mean RMS jitter" },
+    ];
+
+    const el = document.getElementById("stats");
+    el.innerHTML = "";
+    // Define explanatory tooltips for each card key
+    const cardTitles = {
+      "Best channel (Final mean)": "Channel with the highest mean Final SNR across positions",
+      "Worst channel (Final mean)": "Channel with the lowest mean Final SNR across positions",
+      "Global Final CV": "Coefficient of variation (stdev/mean) of final SNR across all rows",
+      "SNR vs Accept r": "Pearson correlation coefficient between final SNR and acceptance rate across rows",
+      "Mean RMS jitter": "Mean RMS jitter across all peak jitter measurements (converted from peak jitter via crest factor)"
+    };
+    for (const c of cards) {
+      const d = document.createElement("div");
+      d.className = "stat " + c.cls;
+      d.innerHTML = `<div class="v">${esc(c.v)}</div><div class="k">${esc(c.k)}</div>`;
+      if (cardTitles[c.k]) d.title = cardTitles[c.k];
+      el.appendChild(d);
+    }
+
+    document.getElementById("pillSummary").textContent = `rows=${parsed.perPosition.length}`;
+  }
+
+  function renderDiagnostics(parsed, agg) {
+    const per = parsed.perPosition;
+    const a = agg.aggregate;
+
+    // Rules:
+    // 1) Missing expected rows (micTotal * channels) beyond a tolerance
+    // 2) Low acceptance rate channels (mean acceptRate < 0.6)
+    // 3) High spatial variance (finalStdev > 3 dB)
+    // 4) Any inverted/negative polarity detected
+    // 5) Jitter coverage low (< 0.5) for a channel
+    const micTotal = parsed.micTotal || agg.posCount || 1;
+    const expected = micTotal * agg.channels.length;
+    const got = per.length;
+
+    const items = [];
+
+    const missing = expected - got;
+    if (missing <= 0) {
+      items.push({ sev:"ok", txt:`Row coverage: ${got}/${expected} (no deficit)` });
+    } else {
+      items.push({ sev:(missing > expected*0.15 ? "bad" : "warn"), txt:`Row coverage: ${got}/${expected} (missing ${missing}). Some blocks likely omit results fields or were not logged.` });
+    }
+
+    const lowAcc = a.filter(x => Number.isFinite(x.acceptRate) && x.acceptRate < 0.60)
+                    .sort((x,y)=> (x.acceptRate - y.acceptRate))
+                    .slice(0,6);
+    if (!lowAcc.length) {
+      items.push({ sev:"ok", txt:`Acceptance: no channels with mean rate < 60% (among channels that report acceptance/correlation).` });
+    } else {
+      items.push({ sev:"warn", txt:`Low acceptance/correlation (<60%): ${lowAcc.map(x=>`${x.channel} ${fmt(x.acceptRate*100,0)}%`).join(", ")}` });
+    }
+
+    const highVar = a.filter(x => Number.isFinite(x.finalStdev) && x.finalStdev > 3.0)
+                     .sort((x,y)=> (y.finalStdev - x.finalStdev))
+                     .slice(0,6);
+    if (!highVar.length) {
+      items.push({ sev:"ok", txt:`Spatial stability: no channels with Final SNR stdev > 3 dB.` });
+    } else {
+      items.push({ sev:"warn", txt:`Spatial variance (Final SNR stdev > 3 dB): ${highVar.map(x=>`${x.channel} ${fmt(x.finalStdev,1)}dB`).join(", ")}` });
+    }
+
+    const pol = a.filter(x => x.polarityFlag !== "—").map(x=>x.channel);
+    if (!pol.length) {
+      items.push({ sev:"ok", txt:`Polarity: no inverted/negative polarity detected in parsed blocks.` });
+    } else {
+      items.push({ sev:"bad", txt:`Polarity: inverted/negative detected on ${pol.join(", ")}.` });
+    }
+
+    const lowJit = a.filter(x => Number.isFinite(x.jitterCoverage) && x.jitterCoverage > 0 && x.jitterCoverage < 0.50)
+                    .sort((x,y)=> x.jitterCoverage - y.jitterCoverage)
+                    .slice(0,8);
+    if (!lowJit.length) {
+      items.push({ sev:"ok", txt:`Jitter fields: coverage is either high or absent (some logs omit jitter for certain blocks).` });
+    } else {
+      items.push({ sev:"warn", txt:`Jitter fields missing often (<50% coverage): ${lowJit.map(x=>`${x.channel} ${(x.jitterCoverage*100).toFixed(0)}%`).join(", ")}` });
+    }
+
+    const diag = document.getElementById("diagnostics");
+    diag.innerHTML = items.map(i => {
+      const cls = i.sev === "ok" ? "sev-ok" : (i.sev === "warn" ? "sev-warn" : "sev-bad");
+      return `<div class="item ${cls}">• ${esc(i.txt)}</div>`;
+    }).join("");
+  }
+
+  function renderCharts(parsed, agg) {
+    destroyCharts();
+
+    const viewMode = document.getElementById("viewMode").value;
+    const metricMode = document.getElementById("metricMode").value;
+    const posFilter = document.getElementById("posFilter").value;
+    // Combine positions flag: when true we ignore the selected position and always use aggregated per-channel metrics.
+    const combine = document.getElementById("combineToggle").checked;
+
+    // Derive theme colors once for reuse in chart options
+    const colorSub = getComputedStyle(document.documentElement).getPropertyValue('--text-sub');
+    // Slightly increase grid line opacity for better legibility
+    const gridColor = 'rgba(255,255,255,0.08)';
+
+    // Chart 1: SNR Overview
+    // Aggregate: finalMean with min/max as separate datasets
+    // Perpos: finalSnr per channel for selected position
+    {
+      const ctx = document.getElementById("chartSnr").getContext("2d");
+      let labels=[], d1=[], d2=[], d3=[];
+      let titlePill = "";
+
+      if (combine || viewMode === "aggregate") {
+        labels = agg.channels;
+        const byCh = new Map(agg.aggregate.map(x=>[x.channel,x]));
+        d1 = labels.map(ch => byCh.get(ch)?.finalMean ?? null);
+        d2 = labels.map(ch => byCh.get(ch)?.finalMin ?? null);
+        d3 = labels.map(ch => byCh.get(ch)?.finalMax ?? null);
+        titlePill = combine ? "Combined final mean/min/max" : "Final mean/min/max";
+      } else {
+        const pos = parseInt(posFilter,10) || 1;
+        labels = agg.channels;
+        const map = new Map();
+        for (const r of parsed.perPosition) if (r.micPos === pos) map.set(r.channel, r);
+        d1 = labels.map(ch => map.get(ch)?.finalSnr ?? null);
+        d2 = labels.map(ch => map.get(ch)?.baseSnr ?? null);
+        titlePill = `Mic pos ${pos}: Final vs Base`;
+      }
+
+      document.getElementById("pillSnr").textContent = titlePill;
+
+      // Apply color coding for SNR bars: high values green, moderate yellow, low red
+      const snrColors = d1.map(v => {
+        if (!Number.isFinite(v)) return 'rgba(200,200,200,0.5)';
+        if (v >= 10) return 'rgba(0,170,100,0.8)';
+        if (v >= 5) return 'rgba(255,200,80,0.8)';
+        return 'rgba(255,100,100,0.8)';
+      });
+      const snrDatasets = (viewMode === "aggregate") ? [
+        { label: "Final SNR (mean)", data: d1, backgroundColor: snrColors, borderColor: snrColors, borderWidth:1 },
+        { label: "Final SNR (min)", data: d2, type:'line', tension:0.15, pointRadius:2 },
+        { label: "Final SNR (max)", data: d3, type:'line', tension:0.15, pointRadius:2 },
+      ] : [
+        { label: "Final SNR", data: d1, backgroundColor: snrColors, borderColor: snrColors, borderWidth:1 },
+        { label: "Base SNR", data: d2 },
+      ];
+      charts.snr = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: snrDatasets
+        },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          scales: {
+            x: {
+              title: { display:true, text:'Channel', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero:true,
+              title: { display:true, text: (combine || viewMode === "aggregate") ? 'Final SNR (dB)' : 'SNR (dB)', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: colorSub, font:{ size:13 } } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const val = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${Number.isFinite(val) ? fmt(val,1) : '—'}`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Attach dataset visibility toggles for SNR chart
+      const finalToggle = document.getElementById('showFinalSnr');
+      const baseToggle = document.getElementById('showBaseSnr');
+      if (finalToggle && baseToggle) {
+        // Set checkboxes to checked by default
+        finalToggle.checked = true;
+        baseToggle.checked = true;
+        finalToggle.onchange = () => {
+          const show = finalToggle.checked;
+          if (combine || viewMode === "aggregate") {
+            // dataset 0 corresponds to final mean
+            charts.snr.getDatasetMeta(0).hidden = !show;
+          } else {
+            // dataset 0 corresponds to final SNR
+            charts.snr.getDatasetMeta(0).hidden = !show;
+          }
+          charts.snr.update();
+        };
+        baseToggle.onchange = () => {
+          const show = baseToggle.checked;
+          if (combine || viewMode === "aggregate") {
+            // datasets 1 and 2 correspond to min and max final SNR
+            charts.snr.getDatasetMeta(1).hidden = !show;
+            charts.snr.getDatasetMeta(2).hidden = !show;
+          } else {
+            // dataset 1 corresponds to base SNR
+            charts.snr.getDatasetMeta(1).hidden = !show;
+          }
+          charts.snr.update();
+        };
+      }
+    }
+
+    // Chart 2: Acceptance/Correlation
+    {
+      const ctx = document.getElementById("chartAcc").getContext("2d");
+      let labels=[], good=[], bad=[];
+      let titlePill = "";
+
+      if (combine || viewMode === "aggregate") {
+        labels = agg.channels;
+        const byCh = new Map(agg.aggregate.map(x=>[x.channel,x]));
+        good = labels.map(ch => {
+          const x = byCh.get(ch);
+          if (!x || !Number.isFinite(x.acceptRate)) return null;
+          return x.acceptRate * 100;
+        });
+        titlePill = combine ? "Combined accept/correlation rate (%)" : "Mean accept/correlation rate (%)";
+        bad = [];
+      } else {
+        const pos = parseInt(posFilter,10) || 1;
+        labels = agg.channels;
+        const map = new Map();
+        for (const r of parsed.perPosition) if (r.micPos === pos) map.set(r.channel, r);
+        good = labels.map(ch => {
+          const r = map.get(ch);
+          if (!r || !Number.isFinite(r.accepted) || !Number.isFinite(r.total) || r.total === 0) return null;
+          return (r.accepted / r.total) * 100;
+        });
+        titlePill = `Mic pos ${pos}: accept/correlation rate (%)`;
+      }
+
+      document.getElementById("pillAcc").textContent = titlePill;
+
+      // Create acceptance bar colors: high acceptance green, moderate yellow, low red
+      const accColors = good.map(v => {
+        if (!Number.isFinite(v)) return 'rgba(200,200,200,0.5)';
+        if (v >= 90) return 'rgba(0,170,100,0.8)';
+        if (v >= 80) return 'rgba(255,200,80,0.8)';
+        return 'rgba(255,100,100,0.8)';
+      });
+      const accDataset = { label: "Rate (%)", data: good, backgroundColor: accColors, borderColor: accColors, borderWidth:1 };
+      charts.acc = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [accDataset] },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          scales: {
+            x: {
+              title: { display:true, text:'Channel', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero:true,
+              max:100,
+              title: { display:true, text:'Accept Rate (%)', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: colorSub, font:{ size:13 } } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const val = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${Number.isFinite(val) ? fmt(val,1) : '—'}`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Chart 3: Jitter
+    // Aggregate: avgJitterMean and peakJitterMax
+    // Perpos: avgJitter and peakJitter for selected position
+    {
+      const ctx = document.getElementById("chartJitter").getContext("2d");
+      let labels=[], dAvg=[], dPeak=[];
+      let titlePill = "";
+
+      if (combine || viewMode === "aggregate") {
+        labels = agg.channels;
+        const byCh = new Map(agg.aggregate.map(x=>[x.channel,x]));
+        dAvg = labels.map(ch => byCh.get(ch)?.avgJitterMean ?? null);
+        dPeak = labels.map(ch => byCh.get(ch)?.peakJitterMax ?? null);
+        titlePill = combine ? "Combined jitter metrics" : "Avg-jitter mean / Peak-jitter max";
+      } else {
+        const pos = parseInt(posFilter,10) || 1;
+        labels = agg.channels;
+        const map = new Map();
+        for (const r of parsed.perPosition) if (r.micPos === pos) map.set(r.channel, r);
+        dAvg = labels.map(ch => map.get(ch)?.avgJitter ?? null);
+        dPeak = labels.map(ch => map.get(ch)?.peakJitter ?? null);
+        titlePill = `Mic pos ${pos}: jitter (only if present in log)`;
+      }
+
+      document.getElementById("pillJit").textContent = titlePill;
+
+      charts.jit = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: "Avg Jitter (us)", data: dAvg, tension:0.15, pointRadius:2 },
+            { label: "Peak Jitter (us)", data: dPeak, tension:0.15, pointRadius:2 },
+          ]
+        },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          scales: {
+            x: {
+              title: { display:true, text:'Channel', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero:true,
+              title: { display:true, text:'Jitter (us)', color: colorSub, font:{ size:16 } },
+              ticks: { color: colorSub, font:{ size:13 } },
+              grid: { color: gridColor }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: colorSub, font:{ size:13 } } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const val = ctx.parsed.y;
+                  return `${ctx.dataset.label}: ${Number.isFinite(val) ? fmt(val,1) : '—'}`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Attach dataset visibility toggles for jitter chart
+      const avgToggle = document.getElementById('showAvgJit');
+      const peakToggle = document.getElementById('showPeakJit');
+      if (avgToggle && peakToggle) {
+        // ensure toggles reflect current state
+        avgToggle.checked = true;
+        peakToggle.checked = true;
+        avgToggle.onchange = () => {
+          const meta = charts.jit.getDatasetMeta(0);
+          meta.hidden = !avgToggle.checked;
+          charts.jit.update();
+        };
+        peakToggle.onchange = () => {
+          const meta = charts.jit.getDatasetMeta(1);
+          meta.hidden = !peakToggle.checked;
+          charts.jit.update();
+        };
+      }
+    }
+
+    // Chart 4: SNR vs Acceptance (scatter)
+    {
+      const ctx = document.getElementById("chartScatter").getContext("2d");
+      // Build data points per channel. When combining, use aggregated mean SNR and accept rate per channel as a single point.
+      const pointMap = new Map();
+      if (combine) {
+        // use aggregated values
+        for (const chAgg of agg.aggregate) {
+          const xVal = Number.isFinite(chAgg.finalMean) ? chAgg.finalMean : null;
+          const yVal = (Number.isFinite(chAgg.acceptRate) ? chAgg.acceptRate * 100 : null);
+          if (xVal == null || yVal == null) continue;
+          pointMap.set(chAgg.channel, [{ x: xVal, y: yVal }]);
+        }
+      } else {
+        // per-row values
+        for (const r of parsed.perPosition) {
+          const xVal = Number.isFinite(r.finalSnr) ? r.finalSnr : null;
+          const yVal = (Number.isFinite(r.accepted) && Number.isFinite(r.total) && r.total) ? (r.accepted / r.total * 100) : null;
+          if (xVal == null || yVal == null) continue;
+          if (!pointMap.has(r.channel)) pointMap.set(r.channel, []);
+          pointMap.get(r.channel).push({ x: xVal, y: yVal });
+        }
+      }
+      const datasets = [];
+      // Assign a consistent color palette for up to 10 channels; else default Chart.js colors.
+      const palette = [
+        'rgba(57,198,255,0.8)', 'rgba(139,124,255,0.8)', 'rgba(74,222,128,0.8)',
+        'rgba(251,191,36,0.8)', 'rgba(251,113,133,0.8)', 'rgba(255,171,0,0.8)',
+        'rgba(0,199,140,0.8)', 'rgba(255,99,132,0.8)', 'rgba(0,123,255,0.8)',
+        'rgba(153,102,255,0.8)'
+      ];
+      let idx = 0;
+      for (const [ch, pts] of pointMap.entries()) {
+        datasets.push({ label: ch, data: pts, showLine: false, backgroundColor: palette[idx % palette.length] });
+        idx++;
+      }
+      // Determine dynamic title. When combining, emphasise that points are per-channel averages.
+      const scatterTitle = combine ? "Channel mean SNR vs Accept Rate" : "Final SNR vs Acceptance Rate";
+      document.getElementById("pillScatter").textContent = scatterTitle;
+      charts.scatter = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { title: { display:true, text:'Final SNR (dB)', color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') }, ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } },
+            y: { beginAtZero:true, max:100, title: { display:true, text:'Accept Rate (%)', color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') }, ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } }
+          },
+          plugins: { legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } } }
+        }
+      });
+    }
+
+    // Chart 5: Final SNR distribution (histogram)
+    {
+      const ctx = document.getElementById("chartHist").getContext("2d");
+      // collect all final SNR values; when combining positions, use channel mean; otherwise use per-position values
+      let values;
+      if (combine) {
+        values = agg.aggregate
+          .map(r => (Number.isFinite(r.finalMean) ? r.finalMean : null))
+          .filter(v => v !== null);
+      } else {
+        values = parsed.perPosition
+          .map(r => (Number.isFinite(r.finalSnr) ? r.finalSnr : null))
+          .filter(v => v !== null);
+      }
+      let labels = [], counts = [];
+      let title = combine ? "Distribution of mean Final SNR" : "Distribution of Final SNR";
+      if (values.length) {
+        // determine number of bins using square root choice or at least 5 bins
+        const nBins = Math.max(5, Math.round(Math.sqrt(values.length)));
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const width = (maxVal - minVal) || 1;
+        const binWidth = width / nBins;
+        // initialize counts
+        counts = Array.from({ length: nBins }, () => 0);
+        // assign to bins
+        for (const v of values) {
+          let idx = Math.floor((v - minVal) / (width || 1) * nBins);
+          if (idx < 0) idx = 0;
+          if (idx >= nBins) idx = nBins - 1;
+          counts[idx]++;
+        }
+        // build labels as bin ranges
+        labels = counts.map((_, i) => {
+          const start = minVal + i * binWidth;
+          const end = start + binWidth;
+          return `${fmt(start,1)}–${fmt(end,1)}`;
+        });
+      }
+      document.getElementById("pillHist").textContent = title;
+      charts.hist = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [ { label: 'Count', data: counts, backgroundColor: 'rgba(57,198,255,0.5)' } ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { title: { display:true, text:'Final SNR bins (dB)', color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') }, ticks:{ color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub'), autoSkip:false } },
+            y: { beginAtZero:true, title:{ display:true, text:'Count', color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') }, ticks:{ color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } }
+          },
+          plugins: {
+            legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } }
+          }
+        }
+      });
+    }
+
+    // Heatmap table (channel x mic position) for selected metricMode
+    renderHeatmap(parsed, agg, metricMode);
+
+    // Detail table
+    renderDetailTable(parsed, agg, viewMode);
+
+    // Channel overview table summarising each channel's metrics
+    if (typeof renderChannelTable === 'function') {
+      renderChannelTable(parsed, agg, combine, viewMode, posFilter);
+    }
+  }
+
+  function metricValue(row, metricMode) {
+    switch(metricMode) {
+      case "finalSnr": return row.finalSnr;
+      case "snrGain": return (Number.isFinite(row.finalSnr) && Number.isFinite(row.baseSnr)) ? (row.finalSnr - row.baseSnr) : null;
+      case "acceptRate": return (Number.isFinite(row.accepted) && Number.isFinite(row.total) && row.total) ? (row.accepted / row.total) : null;
+      case "avgJitter": return row.avgJitter;
+      case "peakJitter": return row.peakJitter;
+      case "peakToSilence": return row.peakToSilence;
+      case "peakMag": return row.peakMag;
+      case "impulseTime": return row.impulseTime;
+      default: return null;
+    }
+  }
+
+  function metricLabel(metricMode) {
+    switch(metricMode) {
+      case "finalSnr": return "Final SNR (dB)";
+      case "snrGain": return "SNR Gain (dB)";
+      case "acceptRate": return "Accept/Correlation rate";
+      case "avgJitter": return "Avg Jitter (us)";
+      case "peakJitter": return "Peak Jitter (us)";
+      case "peakToSilence": return "Peak-to-Silence (dB)";
+      case "peakMag": return "Peak Magnitude (%)";
+      case "impulseTime": return "Impulse TP Time (ms)";
+      default: return metricMode;
+    }
+  }
+
+  function renderHeatmap(parsed, agg, metricMode) {
+    const table = document.getElementById("heatTable");
+    const posCount = agg.posCount || parsed.micTotal || 1;
+    const chans = agg.channels;
+
+    // Build (channel, pos) lookup
+    const lookup = new Map(); // key = `${ch}|${pos}`
+    for (const r of parsed.perPosition) lookup.set(`${r.channel}|${r.micPos}`, r);
+
+    // Gather values for scaling
+    const allVals = [];
+    for (const ch of chans) {
+      for (let p=1;p<=posCount;p++) {
+        const r = lookup.get(`${ch}|${p}`);
+        const v = r ? metricValue(r, metricMode) : null;
+        if (metricMode === "acceptRate" && Number.isFinite(v)) allVals.push(v*100);
+        else if (Number.isFinite(v)) allVals.push(v);
+      }
+    }
+    const mn = minv(allVals);
+    const mx = maxv(allVals);
+
+    const colorFor = (val) => {
+      if (!Number.isFinite(val) || mn == null || mx == null || mn === mx) return "rgba(255,255,255,0.05)";
+      const t = (val - mn) / (mx - mn); // 0..1
+      // Blue -> Purple gradient
+      const r = Math.round(57 + t * (139-57));
+      const g = Math.round(198 + t * (124-198));
+      const b = Math.round(255 + t * (255-255));
+      const a = 0.10 + 0.22 * t;
+      return `rgba(${r},${g},${b},${a})`;
+    };
+
+    let html = "";
+    html += "<thead><tr>";
+    html += `<th>${esc(metricLabel(metricMode))}</th>`;
+    for (let p=1;p<=posCount;p++) html += `<th>Pos ${p}</th>`;
+    html += "</tr></thead>";
+
+    html += "<tbody>";
+    for (const ch of chans) {
+      html += `<tr><td><strong>${esc(ch)}</strong></td>`;
+      for (let p=1;p<=posCount;p++) {
+        const r = lookup.get(`${ch}|${p}`);
+        let v = r ? metricValue(r, metricMode) : null;
+
+        let disp = "—";
+        let valScaled = null;
+        if (metricMode === "acceptRate") {
+          if (Number.isFinite(v)) { valScaled = v*100; disp = fmt(valScaled,1) + "%"; }
+        } else {
+          if (Number.isFinite(v)) { valScaled = v; disp = fmt(v, (metricMode.includes("Jitter") ? 0 : 1)); }
+        }
+
+        const bg = colorFor(valScaled);
+        const note = (!r) ? "missing block" : (!Number.isFinite(v) ? "missing field" : "");
+        html += `<td style="background:${bg}">${esc(disp)}${note ? ` <span class="muted">(${esc(note)})</span>` : ""}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody>";
+
+    table.innerHTML = html;
+    document.getElementById("pillHeat").textContent = metricLabel(metricMode);
+  }
+
+  function renderDetailTable(parsed, agg, viewMode) {
+    const table = document.getElementById("detailTable");
+
+    if (viewMode === "aggregate") {
+      let rows = agg.aggregate.slice();
+      // sort rows based on current detailSort state
+      if (detailSort && detailSort.key) {
+        const key = detailSort.key;
+        rows.sort((a,b) => {
+          const va = a[key];
+          const vb = b[key];
+          // For numeric values, treat non-finite as NaN and sort accordingly
+          const isNumA = Number.isFinite(va);
+          const isNumB = Number.isFinite(vb);
+          if (isNumA && isNumB) return va - vb;
+          if (isNumA) return -1;
+          if (isNumB) return 1;
+          // fallback string comparison
+          const sa = String(va || "").toLowerCase();
+          const sb = String(vb || "").toLowerCase();
+          return sa.localeCompare(sb);
+        });
+        if (!detailSort.asc) rows.reverse();
+      } else {
+        // default sort by channel name
+        rows.sort((a,b) => a.channel.localeCompare(b.channel));
+      }
+
+  /**
+   * Render a channel overview table summarizing per-channel metrics.  Shows final/base SNR,
+   * acceptance rate, average and peak jitter. Colors are applied based on thresholds.
+   * @param {object} parsed The parsed log
+   * @param {object} agg The aggregate object from buildAggregates
+   * @param {boolean} combine Whether positions are combined
+   * @param {string} viewMode The selected view mode ('aggregate' or 'perpos')
+   * @param {string|number} posFilter Selected mic position when in perpos mode
+   */
+  function renderChannelTable(parsed, agg, combine, viewMode, posFilter) {
+    const panel = document.getElementById('channelOverview');
+    const tableDiv = document.getElementById('channelTable');
+    if (!panel || !tableDiv) return;
+    if (!parsed || !agg) { panel.style.display = 'none'; return; }
+    const rows = [];
+    if (combine || viewMode === 'aggregate') {
+      // Use aggregated per-channel statistics
+      for (const chAgg of agg.aggregate) {
+        rows.push({
+          channel: chAgg.channel,
+          final: chAgg.finalMean,
+          base: chAgg.baseMean,
+          acc: (Number.isFinite(chAgg.acceptRate) ? chAgg.acceptRate * 100 : null),
+          avgJit: chAgg.avgJitterMean,
+          peakJit: chAgg.peakJitterMax
+        });
+      }
+    } else {
+      // Use values from selected position
+      const pos = parseInt(posFilter, 10) || 1;
+      const map = new Map();
+      for (const r of parsed.perPosition) {
+        if (r.micPos === pos) map.set(r.channel, r);
+      }
+      for (const ch of agg.channels) {
+        const r = map.get(ch) || {};
+        const accVal = (Number.isFinite(r.accepted) && Number.isFinite(r.total) && r.total) ? (r.accepted / r.total * 100) : null;
+        rows.push({
+          channel: ch,
+          final: r.finalSnr,
+          base: r.baseSnr,
+          acc: accVal,
+          avgJit: r.avgJitter,
+          peakJit: r.peakJitter
+        });
+      }
+    }
+    // Build HTML table
+    let html = '<table><thead><tr>';
+    html += '<th>Channel</th>';
+    html += '<th title="Final signal-to-noise ratio after calibration">Final SNR (dB)</th>';
+    html += '<th title="Baseline signal-to-noise ratio before calibration">Base SNR (dB)</th>';
+    html += '<th title="Percentage of accepted sweeps">Accept Rate (%)</th>';
+    html += '<th title="Average jitter across sweeps">Avg Jitter (us)</th>';
+    html += '<th title="Maximum jitter across sweeps">Peak Jitter (us)</th>';
+    html += '<th title="Letter grade summarising SNR and accept rate quality">Grade</th>';
+    html += '</tr></thead><tbody>';
+    for (const row of rows) {
+      html += '<tr>';
+      html += '<td>' + esc(row.channel) + '</td>';
+      // Final SNR
+      const fv = row.final;
+      let fClass = '';
+      if (Number.isFinite(fv)) {
+        fClass = fv >= 10 ? 'high' : (fv >= 5 ? 'medium' : 'low');
+      }
+      html += `<td class="${fClass}">${Number.isFinite(fv) ? esc(fmt(fv,1)) : '—'}</td>`;
+      // Base SNR
+      html += `<td>${Number.isFinite(row.base) ? esc(fmt(row.base,1)) : '—'}</td>`;
+      // Acceptance rate
+      const av = row.acc;
+      let aClass = '';
+      if (Number.isFinite(av)) {
+        aClass = av >= 90 ? 'high' : (av >= 80 ? 'medium' : 'low');
+      }
+      html += `<td class="${aClass}">${Number.isFinite(av) ? esc(fmt(av,1)) : '—'}</td>`;
+      // Avg Jitter
+      html += `<td>${Number.isFinite(row.avgJit) ? esc(fmt(row.avgJit,1)) : '—'}</td>`;
+      // Peak Jitter
+      html += `<td>${Number.isFinite(row.peakJit) ? esc(fmt(row.peakJit,1)) : '—'}</td>`;
+      // Compute grade based on final SNR and acceptance rate
+      let gradeLetter = '—';
+      // Determine SNR grade
+      let gS = null;
+      if (Number.isFinite(fv)) {
+        if (fv >= 25) gS = 'A';
+        else if (fv >= 20) gS = 'B';
+        else if (fv >= 15) gS = 'C';
+        else if (fv >= 10) gS = 'D';
+        else gS = 'F';
+      }
+      // Determine acceptance grade (convert percentage to fraction 0..1)
+      let gA = null;
+      if (Number.isFinite(av)) {
+        const frac = av / 100;
+        if (frac >= 0.8) gA = 'A';
+        else if (frac >= 0.6) gA = 'B';
+        else if (frac >= 0.4) gA = 'C';
+        else if (frac >= 0.2) gA = 'D';
+        else gA = 'F';
+      }
+      if (gS || gA) {
+        if (!gS) gradeLetter = gA;
+        else if (!gA) gradeLetter = gS;
+        else gradeLetter = (gS > gA ? gS : gA);
+      }
+      // Render grade as a coloured tag
+      let gradeHtml;
+      if (gradeLetter && gradeLetter !== '—') {
+        gradeHtml = `<span class="tag grade-${gradeLetter}">${gradeLetter}</span>`;
+      } else {
+        gradeHtml = '—';
+      }
+      html += `<td>${gradeHtml}</td>`;
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+    panel.style.display = '';
+  }
+
+      let html = "";
+      html += "<thead><tr>";
+      // assign data-key for sorting on each column (except tags) .
+      html += "<th data-key=\"channel\">CH</th>";
+      html += "<th data-key=\"positionsSeen\" title=\"Number of positions reporting data / total mic positions\">Pos Seen</th>";
+      html += "<th data-key=\"acceptRate\" title=\"Average acceptance/correlation rate across positions (\u0025)\">Accept Rate</th>";
+      html += "<th data-key=\"finalMean\" title=\"Mean of final SNR across positions (dB)\">Final Mean</th>";
+      html += "<th data-key=\"finalMin\" title=\"Minimum final SNR across positions (dB)\">Final Min</th>";
+      html += "<th data-key=\"finalMax\" title=\"Maximum final SNR across positions (dB)\">Final Max</th>";
+      html += "<th data-key=\"finalStdev\" title=\"Standard deviation of final SNR across positions (dB)\">Final σ</th>";
+      html += "<th data-key=\"gainMean\" title=\"Mean SNR gain (final minus base) across positions (dB)\">Gain Mean</th>";
+      html += "<th data-key=\"avgJitterMean\" title=\"Mean of average jitter across positions (µs)\">AvgJit Mean</th>";
+      html += "<th data-key=\"peakJitterMax\" title=\"Maximum peak-to-peak jitter across positions (µs)\">PeakJit Max</th>";
+      html += "<th data-key=\"peakToSilenceMean\" title=\"Mean peak-to-silence level ratio across positions (dB)\">Peak-to-Sil Mean</th>";
+      html += "<th data-key=\"peakMagMean\" title=\"Mean peak magnitude across positions (dB)\">PeakMag Mean</th>";
+      html += "<th data-key=\"impulseMean\" title=\"Mean impulse time across positions (ms)\">Impulse Mean</th>";
+      // Derived metrics (visually separated via CSS class)
+      html += "<th class=\"derived\" data-key=\"finalCv\" title=\"Coefficient of variation of final SNR (stdev/mean)\">Final CV</th>";
+      html += "<th class=\"derived\" data-key=\"acceptSnrCorr\" title=\"Pearson correlation between final SNR and acceptance rate\">Acc/SNR r</th>";
+      html += "<th class=\"derived\" data-key=\"peakJitterRmsMean\" title=\"Mean RMS jitter derived from peak jitter (µs)\">RMS Jitter</th>";
+      html += "<th class=\"derived\" data-key=\"grade\" title=\"Letter grade based on SNR and acceptance quality\">Grade</th>";
+      // Do not sort by polarity (string) or coverage by default; but assign key for completeness
+      html += "<th data-key=\"polarityFlag\" title=\"Inverted/negative polarity detected in block\">Polarity</th>";
+      html += "<th data-key=\"jitterCoverage\" title=\"Percentage of positions reporting jitter values\">Jitter Coverage</th>";
+      html += "</tr></thead><tbody>";
+
+      for (const r of rows) {
+        const ar = (Number.isFinite(r.acceptRate) ? (r.acceptRate*100) : null);
+        const jitCov = (Number.isFinite(r.jitterCoverage) ? (r.jitterCoverage*100) : null);
+        const polTag = (r.polarityFlag !== "—") ? `<span class="tag bad">${esc(r.polarityFlag)}</span>` : `<span class="tag ok">OK</span>`;
+        const arTag =
+          (ar == null) ? `<span class="tag">—</span>` :
+          (ar >= 80) ? `<span class="tag ok">${fmt(ar,0)}%</span>` :
+          (ar >= 60) ? `<span class="tag warn">${fmt(ar,0)}%</span>` :
+                       `<span class="tag bad">${fmt(ar,0)}%</span>`;
+
+        const covTag =
+          (jitCov == null || r.positionsSeen === 0) ? `<span class="tag">—</span>` :
+          (jitCov >= 80) ? `<span class="tag ok">${fmt(jitCov,0)}%</span>` :
+          (jitCov >= 50) ? `<span class="tag warn">${fmt(jitCov,0)}%</span>` :
+                           `<span class="tag bad">${fmt(jitCov,0)}%</span>`;
+
+        html += "<tr>";
+        html += `<td><strong>${esc(r.channel)}</strong></td>`;
+        html += `<td>${esc(r.positionsSeen)}/${esc(r.micPositions)}</td>`;
+        html += `<td>${arTag}</td>`;
+        html += `<td>${esc(fmt(r.finalMean,1))}</td>`;
+        html += `<td>${esc(fmt(r.finalMin,1))}</td>`;
+        html += `<td>${esc(fmt(r.finalMax,1))}</td>`;
+        html += `<td>${esc(fmt(r.finalStdev,1))}</td>`;
+        html += `<td>${esc(fmt(r.gainMean,1))}</td>`;
+        html += `<td>${esc(fmt(r.avgJitterMean,0))}</td>`;
+        html += `<td>${esc(fmt(r.peakJitterMax,0))}</td>`;
+        html += `<td>${esc(fmt(r.peakToSilenceMean,1))}</td>`;
+        html += `<td>${esc(fmt(r.peakMagMean,1))}</td>`;
+        html += `<td>${esc(fmt(r.impulseMean,3))}</td>`;
+        // Derived metrics: coefficient of variation (dimensionless), correlation and RMS jitter
+        html += `<td class="derived">${esc(fmt(r.finalCv,2))}</td>`;
+        html += `<td class="derived">${esc(Number.isFinite(r.acceptSnrCorr) ? fmt(r.acceptSnrCorr,2) : '—')}</td>`;
+        html += `<td class="derived">${esc(fmt(r.peakJitterRmsMean,2))}</td>`;
+        // Letter grade cell with colored tag
+        const gradeLetter = r.grade;
+        let gradeTag;
+        if (!gradeLetter || gradeLetter === '—') {
+          gradeTag = '<span class="tag">—</span>';
+        } else {
+          // Map letter grade to a specific CSS class defined in the stylesheet
+          let cls = '';
+          if (gradeLetter === 'A') cls = 'grade-A';
+          else if (gradeLetter === 'B') cls = 'grade-B';
+          else if (gradeLetter === 'C') cls = 'grade-C';
+          else if (gradeLetter === 'D') cls = 'grade-D';
+          else cls = 'grade-F';
+          gradeTag = `<span class="tag ${cls}">${esc(gradeLetter)}</span>`;
+        }
+        html += `<td class="derived">${gradeTag}</td>`;
+        html += `<td>${polTag}</td>`;
+        html += `<td>${covTag}</td>`;
+        html += "</tr>";
+      }
+
+      html += "</tbody>";
+      table.innerHTML = html;
+      document.getElementById("pillTable").textContent = "aggregate";
+      // attach sorting handler to header cells using data-key
+      const head = table.querySelector('thead');
+      if (head) {
+        head.onclick = (ev) => {
+          const th = ev.target.closest('th');
+          if (!th) return;
+          const key = th.getAttribute('data-key');
+          if (!key) return;
+          if (detailSort.key === key) {
+            detailSort.asc = !detailSort.asc;
+          } else {
+            detailSort.key = key;
+            detailSort.asc = true;
+          }
+          renderAll();
+        };
+      }
+      return;
+    }
+
+    // Per-position view
+    const pos = parseInt(document.getElementById("posFilter").value,10) || 1;
+    const rows = parsed.perPosition
+      .filter(r => r.micPos === pos)
+      .slice()
+      .sort((a,b)=> a.channel.localeCompare(b.channel));
+
+    let html = "";
+    html += "<thead><tr>";
+    html += "<th>Pos</th>";
+    html += "<th>CH</th>";
+    html += "<th>Accepted</th>";
+    html += "<th>Rejected</th>";
+    html += "<th>Base SNR</th>";
+    html += "<th>Final SNR</th>";
+    html += "<th>Gain</th>";
+    html += "<th>Peak Jitter</th>";
+    html += "<th>Avg Jitter</th>";
+    html += "<th>Peak Freq</th>";
+    html += "<th>Peak-to-Sil</th>";
+    html += "<th>PeakMag</th>";
+    html += "<th>Impulse</th>";
+    html += "<th>Polarity</th>";
+    html += "<th>Status</th>";
+    html += "</tr></thead><tbody>";
+
+    // Also show channels that are missing a row in this position
+    const rowMap = new Map(rows.map(r=>[r.channel,r]));
+    for (const ch of agg.channels) {
+      const r = rowMap.get(ch);
+      if (!r) {
+        html += `<tr>
+          <td>${pos}</td>
+          <td><strong>${esc(ch)}</strong></td>
+          <td colspan="13" class="muted">— missing block for this mic position (or parser could not find it)</td>
+        </tr>`;
+        continue;
+      }
+
+      const gain = (Number.isFinite(r.finalSnr) && Number.isFinite(r.baseSnr)) ? (r.finalSnr - r.baseSnr) : null;
+
+      const ar = (Number.isFinite(r.accepted) && Number.isFinite(r.total) && r.total) ? (r.accepted/r.total*100) : null;
+      const arTag =
+        (ar == null) ? `<span class="tag">—</span>` :
+        (ar >= 80) ? `<span class="tag ok">${fmt(ar,0)}%</span>` :
+        (ar >= 60) ? `<span class="tag warn">${fmt(ar,0)}%</span>` :
+                     `<span class="tag bad">${fmt(ar,0)}%</span>`;
+
+      const pol = r.polarity ? esc(r.polarity) : "—";
+      const polTag =
+        (!r.polarity) ? `<span class="tag">—</span>` :
+        (String(r.polarity).toLowerCase().includes("invert") || String(r.polarity).toLowerCase().includes("neg"))
+          ? `<span class="tag bad">${pol}</span>`
+          : `<span class="tag ok">${pol}</span>`;
+
+      html += "<tr>";
+      html += `<td>${esc(r.micPos)}</td>`;
+      html += `<td><strong>${esc(r.channel)}</strong></td>`;
+      html += `<td>${arTag} <span class="muted">${esc(r.accepted ?? "—")}/${esc(r.total ?? "—")}</span></td>`;
+      html += `<td>${esc(r.rejected ?? "—")}</td>`;
+      html += `<td>${esc(fmt(r.baseSnr,1))}</td>`;
+      html += `<td>${esc(fmt(r.finalSnr,1))}</td>`;
+      html += `<td>${esc(fmt(gain,1))}</td>`;
+      html += `<td>${Number.isFinite(r.peakJitter) ? esc(fmt(r.peakJitter,0)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${Number.isFinite(r.avgJitter) ? esc(fmt(r.avgJitter,0)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${Number.isFinite(r.peakFreq) ? esc(fmt(r.peakFreq,1)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${Number.isFinite(r.peakToSilence) ? esc(fmt(r.peakToSilence,1)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${Number.isFinite(r.peakMag) ? esc(fmt(r.peakMag,1)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${Number.isFinite(r.impulseTime) ? esc(fmt(r.impulseTime,3)) : `<span class="muted">—</span>`}</td>`;
+      html += `<td>${polTag}</td>`;
+      html += `<td style="max-width:420px;white-space:normal;">${r.status ? esc(r.status) : `<span class="muted">—</span>`}</td>`;
+      html += "</tr>";
+    }
+
+    html += "</tbody>";
+    table.innerHTML = html;
+    document.getElementById("pillTable").textContent = `pos ${pos}`;
+  }
+
+  // ---------- Wiring ----------
+  const uploadArea = document.getElementById("uploadArea");
+  const fileInput = document.getElementById("fileInput");
+
+  // Prevent clicks on the file tabs container from bubbling up to the uploadArea.
+  const fileTabsContainer = document.getElementById("fileTabs");
+  if (fileTabsContainer) {
+    fileTabsContainer.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  // Clicking anywhere on the upload area should open the file chooser.  The file tabs
+  // stop propagation of click events so they don't trigger this handler.
+  uploadArea.addEventListener("click", () => {
+    fileInput.click();
+  });
+  uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("drag"); });
+  uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag"));
+  uploadArea.addEventListener("drop", (e) => {
+    e.preventDefault(); uploadArea.classList.remove("drag");
+    const files = e.dataTransfer.files;
+    if (!files || !files.length) return;
+    // Append dropped files to the list, skipping duplicates by name
+    for (const f of files) {
+      // Avoid loading duplicate files by checking existing names
+      if (!loadedFiles.some(existing => existing.name === f.name)) {
+        loadedFiles.push(f);
+      }
+    }
+    updateFileTabs();
+    // Set active file to the last unique file added and render it
+    activeFileIdx = loadedFiles.length - 1;
+    if (activeFileIdx >= 0) handleFile(loadedFiles[activeFileIdx]);
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    // Append selected files, skipping duplicates by name
+    for (const f of files) {
+      if (!loadedFiles.some(existing => existing.name === f.name)) {
+        loadedFiles.push(f);
+      }
+    }
+    updateFileTabs();
+    // Auto-select the last unique file added
+    activeFileIdx = loadedFiles.length - 1;
+    if (activeFileIdx >= 0) handleFile(loadedFiles[activeFileIdx]);
+    // Clear the file input so the same file can be selected again
+    e.target.value = '';
+  });
+
+  document.getElementById("btnReset").addEventListener("click", () => resetAll());
+
+  document.getElementById("btnExport").addEventListener("click", () => exportCsv());
+
+  document.getElementById("btnSavePng").addEventListener("click", () => savePngs());
+
+  document.getElementById("btnExportMeas").addEventListener("click", () => exportMeasurement());
+
+  // When the combine positions toggle changes, re-render charts if a log is loaded.
+  document.getElementById("combineToggle").addEventListener("change", () => {
+    if (parsed) {
+      renderAll();
+    }
+  });
+
+  document.getElementById("viewMode").addEventListener("change", () => {
+    if (!parsed) return;
+    syncPosFilter();
+    renderAll();
+  });
+
+  document.getElementById("metricMode").addEventListener("change", () => {
+    if (!parsed) return;
+    renderAll();
+  });
+
+  document.getElementById("posFilter").addEventListener("change", () => {
+    if (!parsed) return;
+    renderAll();
+  });
+
+  /**
+   * Update the file tab bar based on the current loadedFiles array.
+   * Creates a button for each loaded file and highlights the active one.
+   */
+  function updateFileTabs() {
+    const tabsContainer = document.getElementById("fileTabs");
+    if (!tabsContainer) return;
+    tabsContainer.innerHTML = "";
+    loadedFiles.forEach((f, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'tab' + (idx === activeFileIdx ? ' active' : '');
+      // Show only the file name (not full path)
+      btn.textContent = f.name || `File ${idx+1}`;
+      btn.addEventListener('click', (e) => {
+        // Prevent clicks on the tab from bubbling up to the upload area
+        e.stopPropagation();
+        activeFileIdx = idx;
+        updateFileTabs();
+        handleFile(f);
+      });
+      tabsContainer.appendChild(btn);
+    });
+    // Show the tabs container only when at least one file is loaded
+    tabsContainer.style.display = loadedFiles.length ? '' : 'none';
+  }
+
+  function syncPosFilter() {
+    const viewMode = document.getElementById("viewMode").value;
+    const sel = document.getElementById("posFilter");
+    if (!parsed) { sel.classList.add("hidden"); return; }
+
+    const posCount = parsed.micTotal || 1;
+    sel.innerHTML = "";
+    for (let p=1;p<=posCount;p++) {
+      const opt = document.createElement("option");
+      opt.value = String(p);
+      opt.textContent = `Mic position ${p}`;
+      sel.appendChild(opt);
+    }
+
+    if (viewMode === "perpos" && posCount > 1) sel.classList.remove("hidden");
+    else sel.classList.add("hidden");
+  }
+
+  async function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = String(reader.result || "");
+      // Attempt to parse as a session log first.  If no per-position data is found, treat as measurement.
+      const p = parseLog(content);
+      if (p && p.perPosition && p.perPosition.length) {
+        // Clear measurement state
+        measurement = null;
+        // build aggregates and render log dashboard
+        const a = buildAggregates(p.perPosition);
+        parsed = { ...p, ...a };
+        showInfo(file, content, p, a);
+        document.getElementById("dashboard").style.display = "";
+        document.getElementById("measurementPanel").style.display = "none";
+        document.getElementById("btnExportMeas").style.display = "none";
+        syncPosFilter();
+        renderAll();
+      } else {
+        // Try parse as measurement
+        const meas = parseMeasurement(content);
+        if (!meas) {
+          alert("Could not parse this file as either a session log or measurement export.");
+          return;
+        }
+        measurement = meas;
+        parsed = null;
+        // Hide log dashboard
+        document.getElementById("dashboard").style.display = "none";
+        // Show measurement UI
+        document.getElementById("measurementPanel").style.display = "";
+        document.getElementById("btnExportMeas").style.display = "";
+        showMeasInfo(file, meas);
+        renderMeasurementStats(meas);
+        renderMeasurementChart(meas);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function renderAll() {
+    const p = { micTotal: parsed.micTotal, perPosition: parsed.perPosition };
+    const a = { channels: parsed.channels, posCount: parsed.posCount, aggregate: parsed.aggregate };
+    renderStats(p, { channels: parsed.channels, posCount: parsed.posCount, aggregate: parsed.aggregate });
+    renderDiagnostics(p, { channels: parsed.channels, posCount: parsed.posCount, aggregate: parsed.aggregate });
+    renderCharts(p, { channels: parsed.channels, posCount: parsed.posCount, aggregate: parsed.aggregate });
+  }
+
+  /**
+   * Render measurement statistics into the measurement summary panel.  Uses the same card-based layout
+   * as the main summary: each stat appears in a rounded card with a large value and smaller label.
+   * @param {object} meas Parsed measurement object
+   */
+  function renderMeasurementStats(meas) {
+    const container = document.getElementById('measStats');
+    if (!container) return;
+    // Build list of stats with labels and formatted values
+    const items = [];
+    items.push({ label:'Samples', value: meas.sampleCount.toLocaleString() });
+    items.push({ label:'Freq range', value: `${fmt(meas.minFreq,1)}–${fmt(meas.maxFreq,1)} Hz` });
+    items.push({ label:'SPL range', value: `${fmt(meas.minSpl,1)}–${fmt(meas.maxSpl,1)} dB` });
+    items.push({ label:'Mean SPL', value: `${fmt(meas.meanSpl,1)} dB` });
+    items.push({ label:'Dynamic range', value: Number.isFinite(meas.dynamicRange) ? `${fmt(meas.dynamicRange,1)} dB` : '—' });
+    items.push({ label:'RMS SPL', value: Number.isFinite(meas.rmsSpl) ? `${fmt(meas.rmsSpl,1)} dB` : '—' });
+    let html = '';
+    for (const it of items) {
+      html += `<div class="stat"><div class="v">${esc(it.value)}</div><div class="l">${esc(it.label)}</div></div>`;
+    }
+    container.innerHTML = html;
+    // Update pill text to describe what is being shown
+    const pill = document.getElementById('pillMeas');
+    if (pill) pill.textContent = 'overview';
+  }
+
+  // Build a CSV string from parsed per-position data and aggregate summary.
+  function buildCsv(parsedData, aggData) {
+    const rows = [];
+    const header = [
+      "micPos", "micTotal", "channel", "accepted", "total", "rejected",
+      "baseSnr", "finalSnr", "peakJitter", "peakFreq", "avgJitter",
+      "polarity", "impulseTime", "peakMag", "peakToSilence", "status"
+    ];
+    rows.push(header);
+    for (const r of parsedData.perPosition) {
+      rows.push([
+        r.micPos,
+        r.micTotal,
+        r.channel,
+        r.accepted ?? "",
+        r.total ?? "",
+        r.rejected ?? "",
+        Number.isFinite(r.baseSnr) ? r.baseSnr : "",
+        Number.isFinite(r.finalSnr) ? r.finalSnr : "",
+        Number.isFinite(r.peakJitter) ? r.peakJitter : "",
+        Number.isFinite(r.peakFreq) ? r.peakFreq : "",
+        Number.isFinite(r.avgJitter) ? r.avgJitter : "",
+        r.polarity ?? "",
+        Number.isFinite(r.impulseTime) ? r.impulseTime : "",
+        Number.isFinite(r.peakMag) ? r.peakMag : "",
+        Number.isFinite(r.peakToSilence) ? r.peakToSilence : "",
+        r.status ?? ""
+      ]);
+    }
+    if (aggData && aggData.aggregate && aggData.aggregate.length) {
+      rows.push([]);
+      rows.push(["Aggregate summary"]);
+      rows.push(["Channel", "PositionsSeen", "MicPositions", "AcceptedSum", "TotalSum", "AcceptRate", "FinalMean", "FinalMin", "FinalMax", "FinalStdev", "GainMean", "GainMin", "GainMax", "AvgJitterMean", "PeakJitterMax", "PeakToSilenceMean", "PeakMagMean", "ImpulseMean", "PolarityFlag", "JitterCoverage"]);
+      for (const a of aggData.aggregate) {
+        rows.push([
+          a.channel,
+          a.positionsSeen,
+          a.micPositions,
+          a.acceptedSum ?? "",
+          a.totalSum ?? "",
+          Number.isFinite(a.acceptRate) ? a.acceptRate : "",
+          Number.isFinite(a.finalMean) ? a.finalMean : "",
+          Number.isFinite(a.finalMin) ? a.finalMin : "",
+          Number.isFinite(a.finalMax) ? a.finalMax : "",
+          Number.isFinite(a.finalStdev) ? a.finalStdev : "",
+          Number.isFinite(a.gainMean) ? a.gainMean : "",
+          Number.isFinite(a.gainMin) ? a.gainMin : "",
+          Number.isFinite(a.gainMax) ? a.gainMax : "",
+          Number.isFinite(a.avgJitterMean) ? a.avgJitterMean : "",
+          Number.isFinite(a.peakJitterMax) ? a.peakJitterMax : "",
+          Number.isFinite(a.peakToSilenceMean) ? a.peakToSilenceMean : "",
+          Number.isFinite(a.peakMagMean) ? a.peakMagMean : "",
+          Number.isFinite(a.impulseMean) ? a.impulseMean : "",
+          a.polarityFlag,
+          Number.isFinite(a.jitterCoverage) ? a.jitterCoverage : ""
+        ]);
+      }
+    }
+    const lines = rows.map(row => row.map(v => {
+      const s = String(v ?? "");
+      return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(","));
+    return lines.join("\n");
+  }
+
+  // Trigger CSV download of parsed data and aggregates
+  function exportCsv() {
+    if (!parsed) return;
+    const csv = buildCsv(parsed, { aggregate: parsed.aggregate });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const ts = new Date().toISOString().replace(/[:\-.]/g, '');
+    link.setAttribute('download', `session_log_export_${ts}.csv`);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  // Download visible charts as PNG files. Iterates over all chart objects and triggers download.
+  function savePngs() {
+    if (!parsed) return;
+    const names = {
+      snr: 'snr_overview',
+      acc: 'acceptance',
+      jit: 'jitter',
+      scatter: 'snr_vs_acceptance',
+      hist: 'snr_distribution'
+    };
+    const ts = new Date().toISOString().replace(/[:\-.]/g, '');
+    for (const [key, chart] of Object.entries(charts)) {
+      if (!chart) continue;
+      try {
+        const dataUrl = chart.toBase64Image('image/png', 1.0);
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        const fname = names[key] || key;
+        link.download = `session_log_${fname}_${ts}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) {
+        console.warn('Could not export chart', key, e);
+      }
+    }
+  }
+
+  function resetAll() {
+    parsed = null;
+    measurement = null;
+    destroyCharts();
+    document.getElementById("dashboard").style.display = "none";
+    document.getElementById("measurementPanel").style.display = "none";
+    document.getElementById("btnExportMeas").style.display = "none";
+    document.getElementById("logInfo").style.display = "none";
+    document.getElementById("logInfo").innerHTML = "";
+    fileInput.value = "";
+    document.getElementById("posFilter").classList.add("hidden");
+    document.getElementById("stats").innerHTML = "";
+    document.getElementById("diagnostics").innerHTML = "";
+    document.getElementById("heatTable").innerHTML = "";
+    document.getElementById("detailTable").innerHTML = "";
+    document.getElementById("pillSummary").textContent = "—";
+    document.getElementById("pillSnr").textContent = "—";
+    document.getElementById("pillAcc").textContent = "—";
+    document.getElementById("pillJit").textContent = "—";
+    document.getElementById("pillHeat").textContent = "table";
+    document.getElementById("pillTable").textContent = "—";
+    // reset sorting state for detail table
+    detailSort = { key: null, asc: true };
+
+    // Reset multi-file state: clear loaded files, reset active index and update tab bar
+    loadedFiles = [];
+    activeFileIdx = null;
+    if (typeof updateFileTabs === 'function') updateFileTabs();
+  }
+</script>
+</body>
+</html>
