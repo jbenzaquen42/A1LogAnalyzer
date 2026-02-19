@@ -110,3 +110,8 @@ The tool is already useful, but most logic still lives in one HTML file. The goa
 - No new console errors in standard flow.
 - Updated docs for behavior changes.
 - Test evidence included in PR.
+
+## Branching note
+
+- Active testing and documentation refinements are currently tracked on branch `tetsting`.
+
