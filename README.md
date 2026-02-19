@@ -1,50 +1,46 @@
 # A1 Log Analyzer
 
-A1 Log Analyzer is a browser-based analysis tool for A1 Acoustix measurement session logs (January 20, 2026 format and later). This repository now includes a clean structure for preserving the original analyzer, hosting the current working version, and tracking project planning.
+A1 Log Analyzer helps review A1X session logs from multiple measurements and compare results quickly in charts and tables.
 
-## Repository Structure
+## Credit
 
-```text
-A1LogAnalyzer/
-├── app/
-│   └── index.html                      # Current working analyzer UI
-├── archive/
-│   └── original/
-│       └── original-analyzer-v3.5.html # Preserved original source upload
-├── samples/
-│   └── fake_logs.zip                   # Example logs for local testing
-├── docs/
-│   ├── ROADMAP.md                      # Product and technical roadmap
-│   └── IMPLEMENTATION_PLAN.md          # Implementation and validation plan
-└── README.md
-```
+This project is based on and inspired by a Facebook post shared by **李益誠** in the Audyssey One Support community, where he shared the analyzer concept and usage notes.
 
-## Original File Preservation and Credit
+## What changed from the original upload
 
-The first repository upload preserves the original analyzer file in `archive/original/original-analyzer-v3.5.html`.
+The original HTML file is kept unchanged in:
+- `archive/original/original-analyzer-v3.5.html`
 
-- **Original creator credit:** Original creator is currently not explicitly identified in the source file metadata. This project preserves the original work and keeps attribution ready to update as soon as the creator name is confirmed.
-- **Action item:** Once creator details are confirmed, update this section and add explicit attribution in both README and the in-app About section.
+The main working file is now:
+- `app/index.html`
 
-## Current Application Entry Point
+Major updates in the current working version include:
+- Focus on multi-mic session analysis and aggregation controls.
+- Drag-and-drop multi-file upload and support for loading more than one session log.
+- View mode controls for aggregate per-channel analysis and per-position analysis.
+- Expanded metric views including final SNR, SNR gain, acceptance rate, jitter metrics, peak-to-silence, peak magnitude, and impulse timing.
+- SNR, acceptance, jitter, scatter, histogram, and heatmap visualizations for quick comparisons.
+- Channel overview and diagnostics panels to highlight missing rows, low coverage, and potential data quality issues.
+- Detailed tables with sorting behavior and CSV export.
+- Chart image export and measurement export actions.
+- Better handling for mixed logs, including legacy-like input fallback paths.
 
-Use `app/index.html` as the main file for ongoing development and improvements.
+## Major next additions planned
 
-## Local Usage
+- Extract parsing and metric logic from the inline script into dedicated modules.
+- Add repeatable fixture-based parser and metric tests.
+- Add CI checks so lint and tests run automatically for each change.
+- Add clearer in-app error and warning messages for malformed logs.
+- Improve large-file performance and accessibility.
 
-1. Open `app/index.html` in a modern browser.
-2. Upload one or more A1 log files.
-3. Review chart and table outputs.
-4. Use `samples/fake_logs.zip` to test parser behavior with sample datasets.
+## Quick start
 
-## Project Documentation
+1. Open `app/index.html` in your browser.
+2. Upload one or more session log files.
+3. Review summary cards, charts, diagnostics, and tables.
+4. Use sample logs from `samples/fake_logs.zip` if needed.
 
-- Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- Implementation and testing plan: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)
+## Project plan
 
-## Professional Standards for This Repository
-
-- Preserve the original source in the archive folder.
-- Keep enhancements isolated to `app/` and supporting documents.
-- Use consistent naming and explicit documentation for releases.
-- Record verification steps for every feature update.
+Roadmap and implementation steps are combined in:
+- `docs/PLAN.md`
