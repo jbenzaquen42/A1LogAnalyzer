@@ -298,7 +298,20 @@
     <div class="header">
       <h1>A1 Evo Session Log Analyzer (Multi-Mic)</h1>
       <div class="sub">Parses multi-position session logs; keeps per-position data, builds aggregates, and flags missing fields.</div>
+    
+    <div class="panel" style="margin-top:14px; padding:10px 12px;">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div class="row" style="gap:8px; margin:0;">
+          <button class="btn" id="navAnalyzer" aria-pressed="true" title="Analyzer view">Analyzer</button>
+          <button class="btn secondary" id="navDocs" aria-pressed="false" title="Changelog / Known Issues / Roadmap">Changelog & Roadmap</button>
+        </div>
+        <div class="small" style="opacity:.9;">
+          <span class="pill">v0.6.0</span>
+          <span class="pill">offline</span>
+        </div>
+      </div>
     </div>
+</div>
 
     <div class="panel">
       <div class="row" style="margin-bottom:10px;">
@@ -348,7 +361,8 @@
     </div>
 
     <div id="dashboard" class="grid" style="display:none;">
-      <div class="panel">
+          <div id="analyzerSection">
+<div class="panel">
         <div class="title">Summary <span id="pillSummary" class="pill">—</span></div>
         <div id="stats" class="stats"></div>
         <div style="height:12px;"></div>
@@ -420,7 +434,58 @@
       </div>
     </div>
 
-    <div class="footer">Supports multiple files. Chart.js via CDN.</div>
+    
+    </div><!-- /analyzerSection -->
+
+    <div id="docsSection" class="panel" style="display:none;">
+      <h2 style="margin:0 0 8px;">Changelog & Roadmap</h2>
+      <div class="sub" style="margin-bottom:12px;">This tab is embedded in the single-file HTML so you can ship one artifact.</div>
+
+      <h3 style="margin:14px 0 8px;">Changelog (v0.6.0)</h3>
+      <div class="diag" role="note" aria-label="Changelog">
+        <div class="item"><strong>Parsing</strong></div>
+        <div class="item">• Robust multi-position parsing with per-position rows; handles legacy/partial formats; tolerates missing blocks (jitter/polarity/impulse).</div>
+        <div class="item">• Added more numeric fields extraction (accepted/total/rejected, base/final SNR, peak/avg jitter, peak frequency, peak-to-silence, peak magnitude, impulse true peak time).</div>
+        <div class="item">• Measurement (.txt) parser: reads REW-style exports and computes min/max, sample count, and range checks.</div>
+
+        <div class="item" style="margin-top:10px;"><strong>Analysis</strong></div>
+        <div class="item">• Aggregate stats per channel across mic positions: mean/min/max/stdev/CV, gain, acceptance rate, jitter coverage, peak-jitter RMS estimate, acceptance↔SNR correlation.</div>
+        <div class="item">• Letter grading (A–F) based on final mean SNR and acceptance rate (worse-of-two).</div>
+
+        <div class="item" style="margin-top:10px;"><strong>UX / UI</strong></div>
+        <div class="item">• Heatmap + detailed tables with tooltips and safer empty-state handling.</div>
+        <div class="item">• Export CSV for downstream analysis.</div>
+        <div class="item">• New embedded docs tab (this page): changelog, known issues, roadmap.</div>
+
+        <div class="item" style="margin-top:10px;"><strong>QA</strong></div>
+        <div class="item">• Validated parser + aggregations against bundled fake logs and the provided real session log.</div>
+      </div>
+
+      <h3 style="margin:16px 0 8px;">Known Issues</h3>
+      <div class="diag" role="note" aria-label="Known issues">
+        <div class="item">• <strong>.ady</strong>, <strong>.mdat</strong>, <strong>.oca</strong> files are not supported (binary/container formats). Export to plain-text logs or REW-style measurement text first.</div>
+        <div class="item">• Some channels/log variants may omit certain metrics (e.g., jitter, polarity). Those cells show “—” and are excluded from aggregates for that metric.</div>
+        <div class="item">• Channel naming is taken verbatim from the log. If your logs contain aliases (e.g., “FHL” vs “FL”), they will be treated as separate channels.</div>
+      </div>
+
+      <h3 style="margin:16px 0 8px;">Roadmap</h3>
+      <div class="diag" role="note" aria-label="Roadmap">
+        <div class="item"><strong>Near-term</strong></div>
+        <div class="item">• Add a “Channel alias map” UI (merge FHL→FL, etc.) + save/load presets.</div>
+        <div class="item">• Add an “Import multiple files” batch report: compare runs and show deltas per channel.</div>
+        <div class="item">• Add a “Quality gates” panel with configurable thresholds and a one-line pass/fail summary.</div>
+
+        <div class="item" style="margin-top:10px;"><strong>Medium-term</strong></div>
+        <div class="item">• Visualization: sparkline per channel across mic positions; histogram of final SNR and acceptance rate.</div>
+        <div class="item">• Export: JSON + Markdown report; printable PDF layout.</div>
+
+        <div class="item" style="margin-top:10px;"><strong>Stretch</strong></div>
+        <div class="item">• Auto-detect outlier mic positions and propose re-measure suggestions (e.g., “pos 4 is 2σ worse on 5 channels”).</div>
+        <div class="item">• “Shareable report” mode: a single HTML report with embedded data (no raw log) for easy sending.</div>
+      </div>
+    </div>
+
+<div class="footer">Supports multiple files. Chart.js via CDN.</div>
   </div>
 
 <script>
@@ -2331,6 +2396,31 @@
     activeFileIdx = null;
     if (typeof updateFileTabs === 'function') updateFileTabs();
   }
+
+  // ---------- Navigation (Analyzer vs Docs) ----------
+  (function setupTopNav(){
+    const btnAnalyzer = document.getElementById('navAnalyzer');
+    const btnDocs = document.getElementById('navDocs');
+    const analyzer = document.getElementById('analyzerSection');
+    const docs = document.getElementById('docsSection');
+    if (!btnAnalyzer || !btnDocs || !analyzer || !docs) return;
+
+    const setView = (mode) => {
+      const isDocs = (mode === 'docs');
+      analyzer.style.display = isDocs ? 'none' : '';
+      docs.style.display = isDocs ? '' : 'none';
+
+      // Toggle pressed + style
+      btnAnalyzer.setAttribute('aria-pressed', String(!isDocs));
+      btnDocs.setAttribute('aria-pressed', String(isDocs));
+      btnAnalyzer.classList.toggle('secondary', isDocs);
+      btnDocs.classList.toggle('secondary', !isDocs);
+    };
+
+    btnAnalyzer.addEventListener('click', () => setView('analyzer'));
+    btnDocs.addEventListener('click', () => setView('docs'));
+  })();
+
 </script>
 </body>
 </html>
