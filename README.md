@@ -32,6 +32,7 @@ Major updates in the current working version include:
 - Add CI checks so lint and tests run automatically for each change.
 - Add clearer in-app error and warning messages for malformed logs.
 - Improve large-file performance and accessibility.
+- Change to python app
 
 ## Quick start
 
@@ -45,7 +46,3 @@ Major updates in the current working version include:
 
 Per request, the current documentation and planning updates are committed on branch `tetsting`.
 
-## Project plan
-
-Roadmap and implementation steps are combined in:
-- `docs/PLAN.md`
