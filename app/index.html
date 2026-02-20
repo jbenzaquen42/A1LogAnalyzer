@@ -84,9 +84,14 @@
       font-size:0.98rem;
       cursor:pointer;
       transition:.15s ease;
-      outline:none;
+      /* Removed outline:none to restore browser default focus outline */
     }
-    .btn:hover, select:hover{border-color:var(--border-hover);}
+    /* Visible focus outline for buttons and selects */
+    .btn:focus, select:focus {
+      outline: 2px solid var(--c-primary);
+      outline-offset: 2px;
+    }
+    .btn:hover, select:hover{border-color:var(--border-hover);} 
     .btn.primary{
       background:rgba(57,198,255,0.14);
       border-color:rgba(57,198,255,0.30);
@@ -109,6 +114,11 @@
     .upload .t1{font-size:1.15rem;}
     .upload .t2{font-size:.9rem;color:var(--text-sub);margin-top:6px;}
     #fileInput{display:none;}
+
+    /* Hidden utility class to toggle element visibility */
+    .hidden {
+      display: none !important;
+    }
 
     .info{
       margin-top:12px;
@@ -330,17 +340,17 @@
 
         <button class="btn primary" id="btnReset" title="Clear all loaded files and reset the interface">Reset</button>
         <button class="btn" id="btnExport" title="Download the analysis tables as a CSV file">Export CSV</button>
-        <button class="btn" id="btnSavePng" title="Save all visible charts to a single PNG image">Save Charts</button>
+        <button class="btn" id="btnSavePng" title="Download each visible chart as its own PNG file">Download Charts (PNG)</button>
         <button class="btn" id="btnExportMeas" style="display:none;" title="Download the currently loaded measurement data as plain text">Export Measurement</button>
       </div>
 
-      <div id="uploadArea" class="upload" title="Click or drag files here to load session logs or REW measurements">
+      <!-- Hidden file input placed before the upload area for accessibility -->
+      <input type="file" id="fileInput" accept=".txt,.log" multiple style="display:none;" />
+      <label id="uploadArea" class="upload" for="fileInput" role="button" tabindex="0" title="Click or drag files here to load session logs or REW measurements">
         <div class="icon">⬆</div>
         <div class="t1">Click or drag & drop your session log or measurement (.txt/.log)</div>
         <div class="t2">Log support: “--- Preparing for Microphone Position … ---” and “-> Averaging … for CH …” blocks. Measurement support: REW “* Measurement data…” exports.</div>
-        <!-- Allow multiple files to be selected at once -->
-        <input type="file" id="fileInput" accept=".txt,.log" multiple />
-      </div>
+      </label>
       <!-- Tab bar to switch between loaded files. Hidden until files are loaded -->
       <div id="fileTabs" class="row" style="display:none;margin-top:12px;flex-wrap:wrap;"></div>
 
@@ -938,33 +948,55 @@
           return num / den;
         })()
         ,
-        // Letter grade based on final mean SNR and acceptance rate.
+        // Letter grade based on a weighted score of final SNR, acceptance rate,
+        // coefficient of variation (CV), average jitter and RMS jitter.  Each component
+        // contributes on a 0–1 scale and is weighted by importance.  Scores <0 are
+        // clamped to 0 and >1 are clamped to 1.  The overall numeric score is then
+        // mapped to a letter grade: ≥0.85→A, ≥0.70→B, ≥0.55→C, ≥0.40→D, otherwise F.
         grade: (() => {
           const fm = avg(finalArr);
           const arate = (totSum ? (accSum / totSum) : null);
-          // Grade for final mean SNR (dB)
-          let gS = null;
+          const cv = (Number.isFinite(avg(finalArr)) && Math.abs(avg(finalArr)) > 0) ? (stdev(finalArr) / avg(finalArr)) : null;
+          const avgJ = avg(avgJitArr);
+          const rmsJ = avg(peakRmsArr);
+          let score = 0;
+          // Contribution from final SNR
           if (Number.isFinite(fm)) {
-            if (fm >= 25) gS = 'A';
-            else if (fm >= 20) gS = 'B';
-            else if (fm >= 15) gS = 'C';
-            else if (fm >= 10) gS = 'D';
-            else gS = 'F';
+            let val = (fm - 15) / 15;
+            val = Math.max(0, Math.min(1, val));
+            score += 0.4 * val;
           }
-          // Grade for acceptance rate (0..1)
-          let gA = null;
+          // Contribution from acceptance rate
           if (arate != null) {
-            if (arate >= 0.8) gA = 'A';
-            else if (arate >= 0.6) gA = 'B';
-            else if (arate >= 0.4) gA = 'C';
-            else if (arate >= 0.2) gA = 'D';
-            else gA = 'F';
+            let val = arate / 0.8;
+            val = Math.max(0, Math.min(1, val));
+            score += 0.3 * val;
           }
-          if (!gS && !gA) return '—';
-          if (!gS) return gA;
-          if (!gA) return gS;
-          // Choose the worse grade (higher letter means worse when comparing ASCII codes)
-          return (gS > gA ? gS : gA);
+          // Contribution from CV (lower CV is better)
+          if (Number.isFinite(cv)) {
+            let val = cv / 0.5;
+            val = Math.max(0, Math.min(1, val));
+            score += 0.1 * (1 - val);
+          }
+          // Contribution from average jitter (lower is better; threshold 50 µs)
+          if (Number.isFinite(avgJ)) {
+            let val = (avgJ <= 50) ? ((50 - avgJ) / 50) : 0;
+            val = Math.max(0, Math.min(1, val));
+            score += 0.1 * val;
+          }
+          // Contribution from RMS jitter (lower is better; threshold 100 µs)
+          if (Number.isFinite(rmsJ)) {
+            let val = (rmsJ <= 100) ? ((100 - rmsJ) / 100) : 0;
+            val = Math.max(0, Math.min(1, val));
+            score += 0.1 * val;
+          }
+          // If no metrics contribute, return placeholder
+          if (score === 0) return '—';
+          if (score >= 0.85) return 'A';
+          if (score >= 0.70) return 'B';
+          if (score >= 0.55) return 'C';
+          if (score >= 0.40) return 'D';
+          return 'F';
         })()
       });
     }
@@ -1051,6 +1083,58 @@
     const peakRmsAll = peakJitAll.map(p => p / crestFactor);
     const rmsJitAllMean = avg(peakRmsAll);
 
+    // Compute overall grade across all channels using the same weighted formula as per-channel grading.
+    // This aggregates channel-level metrics and produces a single letter grade.
+    const overallGrade = (() => {
+      const fmArr = a.map(x => x.finalMean).filter(Number.isFinite);
+      const arArr = a.map(x => x.acceptRate).filter(Number.isFinite);
+      const cvArr = a.map(x => x.finalCv).filter(Number.isFinite);
+      const avgJArr = a.map(x => x.avgJitterMean).filter(Number.isFinite);
+      const rmsArr = a.map(x => x.peakJitterRmsMean).filter(Number.isFinite);
+      let score = 0;
+      // Contribution from mean final SNR
+      const fm = avg(fmArr);
+      if (Number.isFinite(fm)) {
+        let val = (fm - 15) / 15;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.4 * val;
+      }
+      // Contribution from mean acceptance rate
+      const ar = avg(arArr);
+      if (ar != null) {
+        let val = ar / 0.8;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.3 * val;
+      }
+      // Contribution from coefficient of variation (lower is better)
+      const cvMean = avg(cvArr);
+      if (Number.isFinite(cvMean)) {
+        let val = cvMean / 0.5;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.1 * (1 - val);
+      }
+      // Contribution from average jitter (lower is better; 50 µs threshold)
+      const avgJ = avg(avgJArr);
+      if (Number.isFinite(avgJ)) {
+        let val = (avgJ <= 50) ? ((50 - avgJ) / 50) : 0;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.1 * val;
+      }
+      // Contribution from RMS jitter (lower is better; 100 µs threshold)
+      const rmsJ = avg(rmsArr);
+      if (Number.isFinite(rmsJ)) {
+        let val = (rmsJ <= 100) ? ((100 - rmsJ) / 100) : 0;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.1 * val;
+      }
+      if (score === 0) return null;
+      if (score >= 0.85) return 'A';
+      if (score >= 0.70) return 'B';
+      if (score >= 0.55) return 'C';
+      if (score >= 0.40) return 'D';
+      return 'F';
+    })();
+
     const bestCh = a.slice().sort((x,y)=> (y.finalMean??-1) - (x.finalMean??-1))[0] || null;
     const worstCh = a.slice().filter(x=>Number.isFinite(x.finalMean)).sort((x,y)=> (x.finalMean??1e9) - (y.finalMean??1e9))[0] || null;
 
@@ -1067,6 +1151,8 @@
       { cls:"warn", v: (finalAllCv == null ? "—" : fmt(finalAllCv,2)), k:"Global Final CV" },
       { cls:"warn", v: (acceptSnrCorrAll == null ? "—" : fmt(acceptSnrCorrAll,2)), k:"SNR vs Accept r" },
       { cls:"warn", v: (Number.isFinite(rmsJitAllMean) ? fmt(rmsJitAllMean,2) + " us" : "—"), k:"Mean RMS jitter" },
+      // Overall grade summarising the entire log. Shows a coloured tag based on weighted metrics across all channels.
+      { cls: (overallGrade == null ? "primary" : (overallGrade === 'A' ? 'success' : (overallGrade === 'B' ? 'primary' : (overallGrade === 'C' ? 'warn' : 'danger')))), v: (overallGrade == null ? '—' : ('<span class="tag grade-' + overallGrade + '">' + overallGrade + '</span>')), k: "Overall Grade" },
     ];
 
     const el = document.getElementById("stats");
@@ -1245,6 +1331,11 @@
           }
         }
       });
+      // Add accessibility attributes to the SNR chart canvas
+      if (charts.snr && charts.snr.canvas) {
+        charts.snr.canvas.setAttribute('role','img');
+        charts.snr.canvas.setAttribute('aria-label','SNR overview chart showing final and baseline SNR values per channel');
+      }
 
       // Attach dataset visibility toggles for SNR chart
       const finalToggle = document.getElementById('showFinalSnr');
@@ -1351,6 +1442,11 @@
           }
         }
       });
+      // Add accessibility attributes to the Acceptance chart canvas
+      if (charts.acc && charts.acc.canvas) {
+        charts.acc.canvas.setAttribute('role','img');
+        charts.acc.canvas.setAttribute('aria-label','Acceptance rate chart showing acceptance percentages per channel');
+      }
     }
 
     // Chart 3: Jitter
@@ -1417,6 +1513,11 @@
           }
         }
       });
+      // Add accessibility attributes to the Jitter chart canvas
+      if (charts.jit && charts.jit.canvas) {
+        charts.jit.canvas.setAttribute('role','img');
+        charts.jit.canvas.setAttribute('aria-label','Jitter chart showing average and peak jitter per channel');
+      }
 
       // Attach dataset visibility toggles for jitter chart
       const avgToggle = document.getElementById('showAvgJit');
@@ -1490,6 +1591,11 @@
           plugins: { legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-sub') } } }
         }
       });
+      // Add accessibility attributes to the SNR vs Acceptance scatter chart
+      if (charts.scatter && charts.scatter.canvas) {
+        charts.scatter.canvas.setAttribute('role','img');
+        charts.scatter.canvas.setAttribute('aria-label','Scatter plot showing final SNR versus acceptance rate per channel');
+      }
     }
 
     // Chart 5: Final SNR distribution (histogram)
@@ -1550,13 +1656,19 @@
           }
         }
       });
+      // Add accessibility attributes to the Final SNR distribution histogram
+      if (charts.hist && charts.hist.canvas) {
+        charts.hist.canvas.setAttribute('role','img');
+        charts.hist.canvas.setAttribute('aria-label','Histogram showing distribution of final SNR values across channels and positions');
+      }
     }
 
     // Heatmap table (channel x mic position) for selected metricMode
     renderHeatmap(parsed, agg, metricMode);
 
-    // Detail table
-    renderDetailTable(parsed, agg, viewMode);
+    // Detail table: use aggregate view when positions are combined
+    const effView = (combine || viewMode === 'aggregate') ? 'aggregate' : 'perpos';
+    renderDetailTable(parsed, agg, effView);
 
     // Channel overview table summarising each channel's metrics
     if (typeof renderChannelTable === 'function') {
@@ -1736,12 +1848,12 @@
     // Build HTML table
     let html = '<table><thead><tr>';
     html += '<th>Channel</th>';
-    html += '<th title="Final signal-to-noise ratio after calibration">Final SNR (dB)</th>';
-    html += '<th title="Baseline signal-to-noise ratio before calibration">Base SNR (dB)</th>';
-    html += '<th title="Percentage of accepted sweeps">Accept Rate (%)</th>';
-    html += '<th title="Average jitter across sweeps">Avg Jitter (us)</th>';
-    html += '<th title="Maximum jitter across sweeps">Peak Jitter (us)</th>';
-    html += '<th title="Letter grade summarising SNR and accept rate quality">Grade</th>';
+    html += '<th title="Final signal-to-noise ratio after calibration. Higher is better: ≥30 dB is excellent, <15 dB is poor.">Final SNR (dB)</th>';
+    html += '<th title="Baseline signal-to-noise ratio before calibration. Serves as a reference for SNR gain and indicates raw system noise.">Base SNR (dB)</th>';
+    html += '<th title="Acceptance/correlation rate: proportion of sweeps successfully correlated. High values (≥80%) indicate reliable measurements; low values suggest noise or misalignment.">Accept Rate (%)</th>';
+    html += '<th title="Average timing jitter across sweeps in microseconds. Lower is better: values under 50 µs indicate good clock stability.">Avg Jitter (µs)</th>';
+    html += '<th title="Peak-to-peak jitter across sweeps in microseconds. Lower is better: values under 100 µs indicate stable timing.">Peak Jitter (µs)</th>';
+    html += '<th title="Letter grade summarising SNR, acceptance and jitter quality based on a weighted formula (A=excellent, F=poor)">Grade</th>';
     html += '</tr></thead><tbody>';
     for (const row of rows) {
       html += '<tr>';
@@ -1766,36 +1878,65 @@
       html += `<td>${Number.isFinite(row.avgJit) ? esc(fmt(row.avgJit,1)) : '—'}</td>`;
       // Peak Jitter
       html += `<td>${Number.isFinite(row.peakJit) ? esc(fmt(row.peakJit,1)) : '—'}</td>`;
-      // Compute grade based on final SNR and acceptance rate
-      let gradeLetter = '—';
-      // Determine SNR grade
-      let gS = null;
+      // Compute grade based on weighted score of final SNR, acceptance rate,
+      // average jitter and peak jitter.  Final CV is not available for single
+      // rows, so its weight (0.1) is assumed perfect.  Contributions are
+      // clamped to [0,1].  See buildAggregates() for the full formula.
+      let score = 0;
+      // Final SNR contribution
       if (Number.isFinite(fv)) {
-        if (fv >= 25) gS = 'A';
-        else if (fv >= 20) gS = 'B';
-        else if (fv >= 15) gS = 'C';
-        else if (fv >= 10) gS = 'D';
-        else gS = 'F';
+        let val = (fv - 15) / 15;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.4 * val;
       }
-      // Determine acceptance grade (convert percentage to fraction 0..1)
-      let gA = null;
+      // Acceptance rate contribution (percentage to fraction)
       if (Number.isFinite(av)) {
-        const frac = av / 100;
-        if (frac >= 0.8) gA = 'A';
-        else if (frac >= 0.6) gA = 'B';
-        else if (frac >= 0.4) gA = 'C';
-        else if (frac >= 0.2) gA = 'D';
-        else gA = 'F';
+        let frac = av / 100;
+        let val = frac / 0.8;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.3 * val;
       }
-      if (gS || gA) {
-        if (!gS) gradeLetter = gA;
-        else if (!gA) gradeLetter = gS;
-        else gradeLetter = (gS > gA ? gS : gA);
+      // CV weight assumed perfect (1.0) for single rows
+      score += 0.1;
+      // Average jitter contribution (lower is better; threshold 50 µs)
+      if (Number.isFinite(row.avgJit)) {
+        let val = (row.avgJit <= 50) ? ((50 - row.avgJit) / 50) : 0;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.1 * val;
+      }
+      // Peak jitter contribution: convert to RMS via crest factor and threshold 100 µs
+      if (Number.isFinite(row.peakJit)) {
+        const crestFactor = 14.069;
+        let rms = row.peakJit / crestFactor;
+        let val = (rms <= 100) ? ((100 - rms) / 100) : 0;
+        val = Math.max(0, Math.min(1, val));
+        score += 0.1 * val;
+      }
+      let gradeLetter;
+      if (score === 0) {
+        gradeLetter = '—';
+      } else if (score >= 0.85) {
+        gradeLetter = 'A';
+      } else if (score >= 0.70) {
+        gradeLetter = 'B';
+      } else if (score >= 0.55) {
+        gradeLetter = 'C';
+      } else if (score >= 0.40) {
+        gradeLetter = 'D';
+      } else {
+        gradeLetter = 'F';
       }
       // Render grade as a coloured tag
       let gradeHtml;
       if (gradeLetter && gradeLetter !== '—') {
-        gradeHtml = `<span class="tag grade-${gradeLetter}">${gradeLetter}</span>`;
+        // Map to appropriate CSS class
+        let cls = '';
+        if (gradeLetter === 'A') cls = 'grade-A';
+        else if (gradeLetter === 'B') cls = 'grade-B';
+        else if (gradeLetter === 'C') cls = 'grade-C';
+        else if (gradeLetter === 'D') cls = 'grade-D';
+        else cls = 'grade-F';
+        gradeHtml = `<span class="tag ${cls}">${gradeLetter}</span>`;
       } else {
         gradeHtml = '—';
       }
@@ -1812,25 +1953,25 @@
       // assign data-key for sorting on each column (except tags) .
       html += "<th data-key=\"channel\">CH</th>";
       html += "<th data-key=\"positionsSeen\" title=\"Number of positions reporting data / total mic positions\">Pos Seen</th>";
-      html += "<th data-key=\"acceptRate\" title=\"Average acceptance/correlation rate across positions (\u0025)\">Accept Rate</th>";
-      html += "<th data-key=\"finalMean\" title=\"Mean of final SNR across positions (dB)\">Final Mean</th>";
-      html += "<th data-key=\"finalMin\" title=\"Minimum final SNR across positions (dB)\">Final Min</th>";
-      html += "<th data-key=\"finalMax\" title=\"Maximum final SNR across positions (dB)\">Final Max</th>";
-      html += "<th data-key=\"finalStdev\" title=\"Standard deviation of final SNR across positions (dB)\">Final σ</th>";
-      html += "<th data-key=\"gainMean\" title=\"Mean SNR gain (final minus base) across positions (dB)\">Gain Mean</th>";
-      html += "<th data-key=\"avgJitterMean\" title=\"Mean of average jitter across positions (µs)\">AvgJit Mean</th>";
-      html += "<th data-key=\"peakJitterMax\" title=\"Maximum peak-to-peak jitter across positions (µs)\">PeakJit Max</th>";
-      html += "<th data-key=\"peakToSilenceMean\" title=\"Mean peak-to-silence level ratio across positions (dB)\">Peak-to-Sil Mean</th>";
-      html += "<th data-key=\"peakMagMean\" title=\"Mean peak magnitude across positions (dB)\">PeakMag Mean</th>";
-      html += "<th data-key=\"impulseMean\" title=\"Mean impulse time across positions (ms)\">Impulse Mean</th>";
+      html += "<th data-key=\"acceptRate\" title=\"Average acceptance/correlation rate across positions (%). Higher values (≥80%) indicate reliable sweeps; low values suggest noise or misalignment.\">Accept Rate</th>";
+      html += "<th data-key=\"finalMean\" title=\"Mean final SNR across positions (dB). Higher is better (≥30 dB recommended); low values indicate poor signal quality.\">Final Mean</th>";
+      html += "<th data-key=\"finalMin\" title=\"Minimum final SNR across positions (dB). Shows the weakest mic position; values below 15 dB signal problematic positions.\">Final Min</th>";
+      html += "<th data-key=\"finalMax\" title=\"Maximum final SNR across positions (dB). Shows the best mic position; used to gauge variability.\">Final Max</th>";
+      html += "<th data-key=\"finalStdev\" title=\"Standard deviation of final SNR across positions (dB). High values (>3 dB) indicate inconsistent microphone placement or environment.\">Final σ</th>";
+      html += "<th data-key=\"gainMean\" title=\"Mean SNR gain (final minus base) across positions (dB). Positive values show improvement from calibration.\">Gain Mean</th>";
+      html += "<th data-key=\"avgJitterMean\" title=\"Mean of average jitter across positions (µs). Lower is better; values under 50 µs indicate good timing stability.\">AvgJit Mean</th>";
+      html += "<th data-key=\"peakJitterMax\" title=\"Maximum peak-to-peak jitter across positions (µs). Lower is better; values under 100 µs indicate stable timing.\">PeakJit Max</th>";
+      html += "<th data-key=\"peakToSilenceMean\" title=\"Mean peak-to-silence ratio across positions (dB). Higher indicates better dynamic range; low values may indicate a high noise floor.\">Peak-to-Sil Mean</th>";
+      html += "<th data-key=\"peakMagMean\" title=\"Mean peak magnitude across positions (dB). Reflects signal strength; compare relative levels across channels.\">PeakMag Mean</th>";
+      html += "<th data-key=\"impulseMean\" title=\"Mean impulse time across positions (ms). Indicates measurement window alignment; variation should be small.\">Impulse Mean</th>";
       // Derived metrics (visually separated via CSS class)
-      html += "<th class=\"derived\" data-key=\"finalCv\" title=\"Coefficient of variation of final SNR (stdev/mean)\">Final CV</th>";
-      html += "<th class=\"derived\" data-key=\"acceptSnrCorr\" title=\"Pearson correlation between final SNR and acceptance rate\">Acc/SNR r</th>";
-      html += "<th class=\"derived\" data-key=\"peakJitterRmsMean\" title=\"Mean RMS jitter derived from peak jitter (µs)\">RMS Jitter</th>";
-      html += "<th class=\"derived\" data-key=\"grade\" title=\"Letter grade based on SNR and acceptance quality\">Grade</th>";
+      html += "<th class=\"derived\" data-key=\"finalCv\" title=\"Coefficient of variation (stdev/mean) of final SNR. Lower values (<0.5) indicate consistent performance across positions.\">Final CV</th>";
+      html += "<th class=\"derived\" data-key=\"acceptSnrCorr\" title=\"Pearson correlation between final SNR and acceptance rate. Values close to 1 indicate that channels with higher SNR also have higher acceptance rates.\">Acc/SNR r</th>";
+      html += "<th class=\"derived\" data-key=\"peakJitterRmsMean\" title=\"Mean RMS jitter derived from peak jitter (µs). Lower is better; represents typical timing variation.\">RMS Jitter</th>";
+      html += "<th class=\"derived\" data-key=\"grade\" title=\"Letter grade summarising SNR, acceptance, CV and jitter metrics using a weighted formula (A=excellent, F=poor)\">Grade</th>";
       // Do not sort by polarity (string) or coverage by default; but assign key for completeness
-      html += "<th data-key=\"polarityFlag\" title=\"Inverted/negative polarity detected in block\">Polarity</th>";
-      html += "<th data-key=\"jitterCoverage\" title=\"Percentage of positions reporting jitter values\">Jitter Coverage</th>";
+      html += "<th data-key=\"polarityFlag\" title=\"Indicates if inverted or negative polarity was detected in any measurement block; normally 'OK'.\">Polarity</th>";
+      html += "<th data-key=\"jitterCoverage\" title=\"Percentage of positions reporting jitter values. Low coverage (<50%) suggests incomplete jitter data.\">Jitter Coverage</th>";
       html += "</tr></thead><tbody>";
 
       for (const r of rows) {
@@ -2006,6 +2147,14 @@
   // stop propagation of click events so they don't trigger this handler.
   uploadArea.addEventListener("click", () => {
     fileInput.click();
+  });
+
+  // Enable keyboard activation of upload area via Enter or Space
+  uploadArea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      fileInput.click();
+    }
   });
   uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("drag"); });
   uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag"));
