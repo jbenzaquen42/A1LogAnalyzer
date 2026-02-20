@@ -40,6 +40,11 @@ Major updates in the current working version include:
 3. Review summary cards, charts, diagnostics, and tables.
 4. Use sample logs from `samples/fake_logs.zip` if needed.
 
+
+## Branch for current testing updates
+
+Per request, the current documentation and planning updates are committed on branch `tetsting`.
+
 ## Project plan
 
 Roadmap and implementation steps are combined in:
