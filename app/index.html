@@ -312,7 +312,20 @@
     <div class="header">
       <h1>A1 Evo Session Log Analyzer (Multi-Mic)</h1>
       <div class="sub">Parses multi-position session logs; keeps per-position data, builds aggregates, and flags missing fields.</div>
+    
+    <div class="panel" style="margin-top:14px; padding:10px 12px;">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div class="row" style="gap:8px; margin:0;">
+          <button class="btn" id="navAnalyzer" aria-pressed="true" title="Analyzer view">Analyzer</button>
+          <button class="btn secondary" id="navDocs" aria-pressed="false" title="Changelog / Known Issues / Roadmap">Changelog & Roadmap</button>
+        </div>
+        <div class="small" style="opacity:.9;">
+          <span class="pill">v0.6.0</span>
+          <span class="pill">offline</span>
+        </div>
+      </div>
     </div>
+</div>
 
     <!-- Navigation tabs to switch between analyzer and docs -->
     <div id="navTabs" class="row" style="margin-bottom:14px;">
@@ -368,7 +381,8 @@
     </div>
 
     <div id="dashboard" class="grid" style="display:none;">
-      <div class="panel">
+          <div id="analyzerSection">
+<div class="panel">
         <div class="title">Summary <span id="pillSummary" class="pill">—</span></div>
         <div id="stats" class="stats"></div>
         <div style="height:12px;"></div>
