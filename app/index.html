@@ -46,6 +46,8 @@
       display:flex;
       flex-direction:column;
       align-items:center;
+      /* Prevent horizontal scrolling across the page */
+      overflow-x:hidden;
     }
 
     /* Make container responsive: remove fixed max width */
@@ -181,7 +183,11 @@
 
     /* Make chart container height responsive using viewport units and allow more space for legibility */
     .chartWrap{position:relative;min-height:360px;height:50vh;width:100%;overflow:hidden;}
-    .chartWrap.tall{min-height:420px;height:60vh;}
+    /* Adjust taller charts (such as frequency response) to occupy more vertical space */
+    .chartWrap.tall{
+      min-height:480px;
+      height:75vh;
+    }
 
     /* Toggle bar for charts */
     .toggle-group {
@@ -310,6 +316,12 @@
       <div class="sub">Parses multi-position session logs; keeps per-position data, builds aggregates, and flags missing fields.</div>
     </div>
 
+    <!-- Navigation tabs to switch between analyzer and docs -->
+    <div id="navTabs" class="row" style="margin-bottom:14px;">
+      <button class="tab active" data-tab="analyzer">Analyzer</button>
+      <button class="tab" data-tab="docs">Changelog &amp; Roadmap</button>
+    </div>
+
     <div class="panel">
       <div class="row" style="margin-bottom:10px;">
         <select id="viewMode" title="Choose to view aggregated per‑channel results or individual microphone positions">
@@ -426,7 +438,53 @@
       </div>
       <div class="panel">
         <div class="title">Frequency Response <span id="pillMeasChart" class="pill">SPL vs Freq</span></div>
+        <!-- Toggles to show/hide SPL and phase curves in the measurement chart -->
+        <div class="toggle-group">
+          <label title="Show or hide the SPL magnitude curve"><input type="checkbox" id="showMeasSpl" checked /> SPL (dB)</label>
+          <label title="Show or hide the phase curve if present"><input type="checkbox" id="showMeasPhase" checked /> Phase (°)</label>
+        </div>
         <div class="chartWrap tall"><canvas id="chartMeas"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Docs panel: hidden by default and shown when the Docs tab is selected -->
+    <div id="docsPanel" class="grid" style="display:none;">
+      <div class="panel">
+        <div class="title">Changelog</div>
+        <div class="diag" style="line-height:1.4;font-size:0.85rem;">
+          <h3>v0.7.0</h3>
+          <ul>
+            <li>Added weighted grading system combining final SNR, acceptance, CV, average and RMS jitter</li>
+            <li>Introduced overall grade card summarising session performance</li>
+            <li>Added descriptive tooltips for metrics and tables</li>
+            <li>Improved accessibility and ensured layout fits without horizontal scrolling</li>
+            <li>Added dataset toggles for SNR, jitter and measurement charts</li>
+          </ul>
+          <h3>v0.6.0</h3>
+          <ul>
+            <li>Initial multi‑mic rewrite with per‑position parsing and aggregate tables</li>
+            <li>Channel overview with CV, acceptance rate and jitter coverage</li>
+            <li>PNG export of charts and CSV export of data</li>
+          </ul>
+        </div>
+        <div class="title">Known Issues</div>
+        <div class="diag" style="line-height:1.4;font-size:0.85rem;">
+          <ul>
+            <li>Binary formats (.ady, .mdat, .oca) are not supported</li>
+            <li>Channel aliasing/mapping must be done manually outside the tool</li>
+            <li>Data with missing jitter or sweep counts may produce warning diagnostics</li>
+          </ul>
+        </div>
+        <div class="title">Roadmap</div>
+        <div class="diag" style="line-height:1.4;font-size:0.85rem;">
+          <ul>
+            <li>Batch comparison across multiple sessions</li>
+            <li>Customisable quality gates and thresholds</li>
+            <li>One‑click report generator (HTML/PDF)</li>
+          </ul>
+          <p>GitHub: <a href="https://github.com/" target="_blank" style="color:var(--c-primary);text-decoration:underline;">View source</a></p>
+          <p style="opacity:0.8;">Original analysis by Acousticx; multi‑mic enhancements by community contributors.</p>
+        </div>
       </div>
     </div>
 
@@ -584,18 +642,22 @@
     const phases = meas.points.map(p => (p.phase != null ? p.phase : null));
     const phaseCount = phases.filter(x => Number.isFinite(x)).length;
     const colorSub = getComputedStyle(document.documentElement).getPropertyValue('--text-sub');
-    const colorPrimary = getComputedStyle(document.documentElement).getPropertyValue('--c-primary');
+    // Build datasets based on toggle checkboxes.  Users can enable or disable SPL and phase curves.
     const datasets = [];
-    datasets.push({
-      label: 'SPL (dB)',
-      data: spls,
-      borderColor: 'rgba(57,198,255,0.9)',
-      backgroundColor: 'rgba(57,198,255,0.2)',
-      pointRadius: 0,
-      tension: 0.2,
-      yAxisID: 'spl',
-    });
-    if (phaseCount > meas.points.length / 2) {
+    const showSpl = document.getElementById('showMeasSpl') ? document.getElementById('showMeasSpl').checked : true;
+    const showPhase = document.getElementById('showMeasPhase') ? document.getElementById('showMeasPhase').checked : true;
+    if (showSpl) {
+      datasets.push({
+        label: 'SPL (dB)',
+        data: spls,
+        borderColor: 'rgba(57,198,255,0.9)',
+        backgroundColor: 'rgba(57,198,255,0.2)',
+        pointRadius: 0,
+        tension: 0.2,
+        yAxisID: 'spl',
+      });
+    }
+    if (showPhase && phaseCount > meas.points.length / 2) {
       datasets.push({
         label: 'Phase (°)',
         data: phases,
@@ -1138,6 +1200,9 @@
     const bestCh = a.slice().sort((x,y)=> (y.finalMean??-1) - (x.finalMean??-1))[0] || null;
     const worstCh = a.slice().filter(x=>Number.isFinite(x.finalMean)).sort((x,y)=> (x.finalMean??1e9) - (y.finalMean??1e9))[0] || null;
 
+    // Each card definition can supply either `v` (escaped value) or `html` (raw HTML) for the value shown. When
+    // using `html`, the value will be inserted directly into the DOM without escaping. This is used for the
+    // overall grade tag so that the coloured badge renders correctly instead of being escaped into plain text.
     const cards = [
       { cls:"primary", v: channels, k:"Channels" },
       { cls:"primary", v: micTotal, k:"Mic positions" },
@@ -1152,7 +1217,8 @@
       { cls:"warn", v: (acceptSnrCorrAll == null ? "—" : fmt(acceptSnrCorrAll,2)), k:"SNR vs Accept r" },
       { cls:"warn", v: (Number.isFinite(rmsJitAllMean) ? fmt(rmsJitAllMean,2) + " us" : "—"), k:"Mean RMS jitter" },
       // Overall grade summarising the entire log. Shows a coloured tag based on weighted metrics across all channels.
-      { cls: (overallGrade == null ? "primary" : (overallGrade === 'A' ? 'success' : (overallGrade === 'B' ? 'primary' : (overallGrade === 'C' ? 'warn' : 'danger')))), v: (overallGrade == null ? '—' : ('<span class="tag grade-' + overallGrade + '">' + overallGrade + '</span>')), k: "Overall Grade" },
+      // Overall grade summarising the entire log. Use `html` field instead of `v` so the tag is not escaped.
+      { cls: (overallGrade == null ? "primary" : (overallGrade === 'A' ? 'success' : (overallGrade === 'B' ? 'primary' : (overallGrade === 'C' ? 'warn' : 'danger')))), html: (overallGrade == null ? '—' : ('<span class="tag grade-' + overallGrade + '">' + overallGrade + '</span>')), k: "Overall Grade" },
     ];
 
     const el = document.getElementById("stats");
@@ -1168,7 +1234,9 @@
     for (const c of cards) {
       const d = document.createElement("div");
       d.className = "stat " + c.cls;
-      d.innerHTML = `<div class="v">${esc(c.v)}</div><div class="k">${esc(c.k)}</div>`;
+      // Use raw HTML for cards with `html` field; otherwise escape the value.
+      const val = (c.hasOwnProperty('html')) ? c.html : esc(c.v);
+      d.innerHTML = `<div class="v">${val}</div><div class="k">${esc(c.k)}</div>`;
       if (cardTitles[c.k]) d.title = cardTitles[c.k];
       el.appendChild(d);
     }
@@ -2301,6 +2369,11 @@
         document.getElementById("btnExportMeas").style.display = "";
         showMeasInfo(file, meas);
         renderMeasurementStats(meas);
+        // Set up measurement dataset toggle listeners
+        const splToggle = document.getElementById('showMeasSpl');
+        const phaseToggle = document.getElementById('showMeasPhase');
+        if (splToggle) splToggle.onchange = () => renderMeasurementChart(meas);
+        if (phaseToggle) phaseToggle.onchange = () => renderMeasurementChart(meas);
         renderMeasurementChart(meas);
       }
     };
@@ -2480,6 +2553,35 @@
     activeFileIdx = null;
     if (typeof updateFileTabs === 'function') updateFileTabs();
   }
+
+  // Set up navigation tabs for switching between analyzer and docs views.  This closure runs once on page load.
+  (function initNavTabs() {
+    const navContainer = document.getElementById('navTabs');
+    if (!navContainer) return;
+    const tabs = navContainer.querySelectorAll('.tab');
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabs.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        if (tab === 'docs') {
+          document.getElementById('docsPanel').style.display = '';
+          document.getElementById('dashboard').style.display = 'none';
+          document.getElementById('measurementPanel').style.display = 'none';
+        } else {
+          document.getElementById('docsPanel').style.display = 'none';
+          // Show measurement panel if a measurement file is loaded; otherwise show dashboard
+          if (measurement) {
+            document.getElementById('measurementPanel').style.display = '';
+            document.getElementById('dashboard').style.display = 'none';
+          } else {
+            document.getElementById('dashboard').style.display = (parsed ? '' : 'none');
+            document.getElementById('measurementPanel').style.display = 'none';
+          }
+        }
+      });
+    });
+  })();
 </script>
 </body>
 </html>
